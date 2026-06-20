@@ -1,5 +1,5 @@
 /**
- * Core Type Definitions for Sub2API Frontend
+ * Core Type Definitions for 石头中转站 Frontend
  */
 
 // ==================== Common Types ====================

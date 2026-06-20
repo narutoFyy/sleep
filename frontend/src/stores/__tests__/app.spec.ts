@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useAppStore } from '@/stores/app'
+import { DEFAULT_SITE_NAME, normalizeSiteName, useAppStore } from '@/stores/app'
 import { getPublicSettings } from '@/api/auth'
 
 // Mock API 模块
@@ -12,11 +12,26 @@ vi.mock('@/api/auth', () => ({
   getPublicSettings: vi.fn(),
 }))
 
+describe('normalizeSiteName', () => {
+  it('把空值和默认旧品牌归一为石头中转站', () => {
+    expect(normalizeSiteName(undefined)).toBe(DEFAULT_SITE_NAME)
+    expect(normalizeSiteName('')).toBe(DEFAULT_SITE_NAME)
+    expect(normalizeSiteName('   ')).toBe(DEFAULT_SITE_NAME)
+    expect(normalizeSiteName('Sub2API')).toBe(DEFAULT_SITE_NAME)
+    expect(normalizeSiteName(' sub2api ')).toBe(DEFAULT_SITE_NAME)
+  })
+
+  it('保留自定义站点名称', () => {
+    expect(normalizeSiteName('Custom Gateway')).toBe('Custom Gateway')
+  })
+})
+
 describe('useAppStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.useFakeTimers()
     localStorage.clear()
+    window.history.replaceState({}, '', '/')
     // 清除 window.__APP_CONFIG__
     delete (window as any).__APP_CONFIG__
   })
@@ -126,6 +141,39 @@ describe('useAppStore', () => {
   // --- 侧边栏 ---
 
   describe('侧边栏管理', () => {
+    it('默认使用 classic 宽侧栏外壳', () => {
+      const store = useAppStore()
+
+      expect(store.stoneShell).toBe(false)
+    })
+
+    it('URL 参数 shell=stone 会启用 Stone 外壳并持久化', () => {
+      window.history.replaceState({}, '', '/dashboard?shell=stone')
+
+      const store = useAppStore()
+
+      expect(store.stoneShell).toBe(true)
+      expect(localStorage.getItem('stone_shell')).toBe('1')
+    })
+
+    it('URL 参数 shell=classic 会启用 classic 宽侧栏并持久化', () => {
+      localStorage.setItem('stone_shell', '1')
+      window.history.replaceState({}, '', '/dashboard?shell=classic')
+
+      const store = useAppStore()
+
+      expect(store.stoneShell).toBe(false)
+      expect(localStorage.getItem('stone_shell')).toBe('0')
+    })
+
+    it('本地偏好 stone_shell=1 时继续使用 Stone 外壳', () => {
+      localStorage.setItem('stone_shell', '1')
+
+      const store = useAppStore()
+
+      expect(store.stoneShell).toBe(true)
+    })
+
     it('toggleSidebar 切换折叠状态', () => {
       const store = useAppStore()
       expect(store.sidebarCollapsed).toBe(false)
@@ -271,6 +319,19 @@ describe('useAppStore', () => {
       expect(store.siteLogo).toBe('/logo.png')
       expect(store.siteVersion).toBe('1.0.0')
       expect(store.publicSettingsLoaded).toBe(true)
+    })
+
+    it('注入配置仍返回旧品牌时显示石头中转站', () => {
+      const windowAny = window as any
+      windowAny.__APP_CONFIG__ = {
+        site_name: 'Sub2API',
+      }
+
+      const store = useAppStore()
+      const result = store.initFromInjectedConfig()
+
+      expect(result).toBe(true)
+      expect(store.siteName).toBe(DEFAULT_SITE_NAME)
     })
 
     it('无注入配置时返回 false', () => {

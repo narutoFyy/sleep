@@ -1,0 +1,8 @@
+/* Global override to make dashboard panels transparent to show the animated background via liquidGL */
+.liquid-target {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark .liquid-target {
+  background-color: rgba(30, 41, 59, 0.15) !important;
+}

@@ -14,6 +14,35 @@ import {
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
 
+export const DEFAULT_SITE_NAME = '石头中转站'
+
+export function normalizeSiteName(value?: string): string {
+  const name = value?.trim()
+  if (!name || name.toLowerCase() === 'sub2api') {
+    return DEFAULT_SITE_NAME
+  }
+  return name
+}
+
+// 读取 Stone 外壳偏好：URL ?shell=stone|classic 优先并写入 localStorage；否则读 localStorage；
+// 无任何偏好时默认使用 classic 宽侧栏，保证导航文字常显。
+function readStoneShellPref(): boolean {
+  try {
+    const param = new URLSearchParams(window.location.search).get('shell')
+    if (param === 'stone' || param === 'classic') {
+      const on = param === 'stone'
+      localStorage.setItem('stone_shell', on ? '1' : '0')
+      return on
+    }
+    const stored = localStorage.getItem('stone_shell')
+    if (stored === '1') return true
+    if (stored === '0') return false
+  } catch {
+    // localStorage 不可用时回退到默认
+  }
+  return false
+}
+
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
 
@@ -22,10 +51,13 @@ export const useAppStore = defineStore('app', () => {
   const loading = ref<boolean>(false)
   const toasts = ref<Toast[]>([])
 
+  // Stone 控制台外壳开关：true 启用新 Stone 布局原型（细导航轨 + 命令栏），false 沿用旧侧栏。
+  const stoneShell = ref<boolean>(readStoneShellPref())
+
   // Public settings cache state
   const publicSettingsLoaded = ref<boolean>(false)
   const publicSettingsLoading = ref<boolean>(false)
-  const siteName = ref<string>('Sub2API')
+  const siteName = ref<string>(DEFAULT_SITE_NAME)
   const siteLogo = ref<string>('')
   const siteVersion = ref<string>('')
   const contactInfo = ref<string>('')
@@ -82,6 +114,22 @@ export const useAppStore = defineStore('app', () => {
    */
   function setMobileOpen(open: boolean): void {
     mobileOpen.value = open
+  }
+
+  /**
+   * 切换/设置 Stone 外壳开关，并持久化到 localStorage。
+   */
+  function setStoneShell(on: boolean): void {
+    stoneShell.value = on
+    try {
+      localStorage.setItem('stone_shell', on ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+
+  function toggleStoneShell(): void {
+    setStoneShell(!stoneShell.value)
   }
 
   /**
@@ -292,7 +340,7 @@ export const useAppStore = defineStore('app', () => {
       window.__APP_CONFIG__ = { ...config }
     }
     cachedPublicSettings.value = config
-    siteName.value = config.site_name || 'Sub2API'
+    siteName.value = normalizeSiteName(config.site_name)
     siteLogo.value = config.site_logo || ''
     siteVersion.value = config.version || ''
     contactInfo.value = config.contact_info || ''
@@ -411,6 +459,7 @@ export const useAppStore = defineStore('app', () => {
     mobileOpen,
     loading,
     toasts,
+    stoneShell,
 
     // Public settings state
     publicSettingsLoaded,
@@ -440,6 +489,8 @@ export const useAppStore = defineStore('app', () => {
     setSidebarCollapsed,
     toggleMobileSidebar,
     setMobileOpen,
+    setStoneShell,
+    toggleStoneShell,
     setLoading,
     showToast,
     showSuccess,

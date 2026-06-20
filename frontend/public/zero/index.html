@@ -1,0 +1,1706 @@
+<!doctype html>
+<html lang="zh-CN" class="no-js">
+  <head>
+    <title>石头中转站 - AI API 中转服务</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <meta
+      name="description"
+      content="石头中转站访客官网。稳定的 AI API 中转、订阅接入与登录入口。"
+    />
+    <script>
+      function openStoneAuth(mode) {
+        try {
+          if (window.top && window.top !== window) {
+            window.top.postMessage(
+              { type: "stone-auth", mode },
+              window.location.origin,
+            );
+            return false;
+          }
+        } catch (error) {}
+
+        window.location.href = "/home?auth=" + mode;
+        return false;
+      }
+
+      function preventZoom(e) {
+        (e.preventDefault(), (document.body.style.zoom = 1));
+      }
+      (Object.assign ||
+        document.documentElement.classList.add(
+          "not-supported not-supported--browser",
+        ),
+        document.documentElement.classList.remove("no-js"),
+        /(ipad|iphone|android)/i.test(
+          (navigator.userAgent || navigator.vendor).toLowerCase(),
+        )
+          ? document.documentElement.classList.add("is-mobile")
+          : document.documentElement.classList.add("is-desktop"),
+        window.addEventListener("wheel", (e) => e.preventDefault(), {
+          passive: !1,
+        }),
+        document.addEventListener("gesturestart", (e) => preventZoom(e)),
+        document.addEventListener("gesturechange", (e) => preventZoom(e)),
+        document.addEventListener("gestureend", (e) => preventZoom(e)));
+    </script>
+    <link
+      rel="shortcut icon"
+      href="./assets/meta/favicon.ico"
+    />
+    <link
+      id="apple-touch-icon"
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="./assets/meta/apple-touch-icon.png"
+    />
+    <link
+      id="icon32"
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="./assets/meta/favicon-32x32.png"
+      media="(prefers-color-scheme: light)"
+    />
+    <link
+      id="icon32"
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="./assets/meta/dark/favicon-32x32.png"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link
+      id="icon64"
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="./assets/meta/favicon-16x16.png"
+      media="(prefers-color-scheme: light)"
+    />
+    <link
+      id="icon64"
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="./assets/meta/dark/favicon-16x16.png"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link
+      href="./assets/meta/favicon.ico"
+      rel="shortcut icon"
+      media="(prefers-color-scheme: light)"
+    />
+    <link
+      href="./assets/meta/dark/favicon.ico"
+      rel="shortcut icon"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link id="manifest" rel="manifest" href="./assets/meta/site.webmanifest" />
+    <link
+      rel="mask-icon"
+      href="./assets/meta/safari-pinned-tab.svg"
+      color="#000000"
+    />
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    <meta name="theme-color" content="#ffffff" />
+    <script src="./assets/js/dat.gui.min.js"></script>
+    <script type="module" crossorigin src="/zero/index.js"></script>
+    <link rel="stylesheet" href="/zero/style.css" />
+    <style>
+      .navbar-logo img {
+        display: none !important;
+      }
+
+      .stone-brand {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        font-family: Inter, sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0;
+        color: #f8fbff;
+        white-space: nowrap;
+      }
+
+      .stone-brand::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        margin-right: 10px;
+        border-radius: 999px;
+        background: #0df6ff;
+        box-shadow:
+          0 0 18px rgba(13, 246, 255, 0.9),
+          0 0 40px rgba(16, 140, 255, 0.45);
+      }
+
+      #download,
+      .integration-hero-switch-wrapper,
+      .integration-hero-icons-wrapper {
+        display: none !important;
+      }
+
+      .footer-footer-socials {
+        justify-content: center;
+      }
+
+      #stone-mobile-fallback {
+        position: fixed;
+        inset: 0;
+        z-index: 100000;
+        display: none;
+        min-height: 100svh;
+        padding: 24px;
+        overflow: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        background:
+          radial-gradient(circle at 22% 12%, rgba(13, 246, 255, 0.24), transparent 34%),
+          radial-gradient(circle at 82% 72%, rgba(173, 38, 255, 0.18), transparent 36%),
+          linear-gradient(145deg, #03070a 0%, #070b12 48%, #020406 100%);
+        color: #f5fbff;
+        opacity: 1;
+        transition: opacity 0.45s ease;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      html.is-mobile #stone-mobile-fallback {
+        display: flex;
+      }
+
+      html.stone-mobile-fallback--dismissed #stone-mobile-fallback {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .stone-mobile-fallback__shell {
+        width: min(100%, 480px);
+        min-height: calc(100svh - 48px);
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 32px;
+      }
+
+      .stone-mobile-fallback__top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .stone-mobile-fallback__brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .stone-mobile-fallback__brand::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #0df6ff;
+        box-shadow: 0 0 28px rgba(13, 246, 255, 0.85);
+      }
+
+      .stone-mobile-fallback__status {
+        font-family: IBM Plex Mono, monospace;
+        font-size: 11px;
+        color: rgba(245, 251, 255, 0.62);
+      }
+
+      .stone-mobile-fallback__main {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .stone-mobile-fallback__kicker {
+        font-family: IBM Plex Mono, monospace;
+        font-size: 12px;
+        color: rgba(13, 246, 255, 0.82);
+        text-transform: uppercase;
+      }
+
+      .stone-mobile-fallback__title {
+        margin: 0;
+        font-size: clamp(42px, 15vw, 72px);
+        line-height: 0.95;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .stone-mobile-fallback__copy {
+        max-width: 28em;
+        font-size: 16px;
+        line-height: 1.7;
+        color: rgba(245, 251, 255, 0.72);
+      }
+
+      .stone-mobile-fallback__actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .stone-mobile-fallback__button {
+        min-height: 48px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .stone-mobile-fallback__button--primary {
+        background: #0df6ff;
+        color: #031014;
+        box-shadow: 0 0 34px rgba(13, 246, 255, 0.28);
+      }
+
+      .stone-mobile-fallback__button--secondary {
+        border: 1px solid rgba(245, 251, 255, 0.22);
+        color: #f5fbff;
+      }
+
+      .stone-mobile-fallback__list {
+        display: grid;
+        gap: 10px;
+        padding-bottom: 6px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: rgba(245, 251, 255, 0.66);
+      }
+
+      .stone-mobile-fallback__list li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .stone-mobile-fallback__list li::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: #0df6ff;
+      }
+
+      .stone-mobile-fallback__note {
+        font-size: 12px;
+        line-height: 1.6;
+        color: rgba(245, 251, 255, 0.5);
+      }
+
+      @media (max-width: 1000px) {
+        #stone-mobile-fallback {
+          display: flex;
+        }
+      }
+
+      @media (max-width: 360px) {
+        #stone-mobile-fallback {
+          padding: 18px;
+        }
+
+        .stone-mobile-fallback__shell {
+          min-height: calc(100svh - 36px);
+        }
+
+        .stone-mobile-fallback__actions {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stone-mobile-fallback" aria-label="石头中转站手机访问入口">
+      <div class="stone-mobile-fallback__shell">
+        <div class="stone-mobile-fallback__top">
+          <span class="stone-mobile-fallback__brand">石头中转站</span>
+          <span class="stone-mobile-fallback__status">MOBILE READY</span>
+        </div>
+        <main class="stone-mobile-fallback__main">
+          <div>
+            <p class="stone-mobile-fallback__kicker">AI API RELAY</p>
+            <h1 class="stone-mobile-fallback__title">稳定接入<br />模型服务</h1>
+          </div>
+          <p class="stone-mobile-fallback__copy">
+            手机端正在加载 Zero 动效版官网。即使网络或设备性能较慢，也可以先从这里进入石头中转站控制台。
+          </p>
+          <div class="stone-mobile-fallback__actions">
+            <a class="stone-mobile-fallback__button stone-mobile-fallback__button--primary" href="/home?auth=login" target="_top" onclick="return openStoneAuth('login')">登录</a>
+            <a class="stone-mobile-fallback__button stone-mobile-fallback__button--secondary" href="/home?auth=register" target="_top" onclick="return openStoneAuth('register')">注册</a>
+          </div>
+        </main>
+        <ul class="stone-mobile-fallback__list">
+          <li>统一 API Key、额度与用量入口。</li>
+          <li>支持多模型接入与请求转发。</li>
+          <li>桌面端仍保留完整 Zero 动效体验。</li>
+        </ul>
+        <p class="stone-mobile-fallback__note">
+          动效加载完成后，此入口会自动淡出。
+        </p>
+      </div>
+    </div>
+    <script>
+      (() => {
+        const root = document.documentElement;
+        const isMobileScreen = () =>
+          root.classList.contains("is-mobile") ||
+          window.matchMedia("(max-width: 1000px)").matches;
+
+        if (!isMobileScreen()) return;
+
+        let checks = 0;
+        const canDismissFallback = () => {
+          const preloader = document.getElementById("preloader");
+          const sections = document.getElementById("sections");
+
+          if (!root.classList.contains("is-ready")) return false;
+          if (preloader && preloader.isConnected) return false;
+          if (!sections) return false;
+
+          const sectionStyles = window.getComputedStyle(sections);
+          return Number(sectionStyles.opacity || 0) > 0.2;
+        };
+
+        const watchZeroReady = () => {
+          if (canDismissFallback()) {
+            root.classList.add("stone-mobile-fallback--dismissed");
+            return;
+          }
+
+          checks += 1;
+          if (checks < 50) window.setTimeout(watchZeroReady, 500);
+        };
+
+        window.setTimeout(watchZeroReady, 1200);
+        window.addEventListener("load", () =>
+          window.setTimeout(watchZeroReady, 1200),
+        );
+      })();
+    </script>
+    <canvas id="canvas"></canvas>
+    <div id="ui">
+      <div id="download">
+        <div class="download-container">
+          <button id="closeDownload">
+            <img
+              src="/zero/assets/images/icons/ui/close-menu.png"
+              alt="close menu icon"
+            />
+          </button>
+          <h3>快速入口</h3>
+          <div class="download-buttons"></div>
+        </div>
+      </div>
+      <div id="preloader" class="preloader">
+        <div class="preloader-container">
+          <div class="preloader-logo"></div>
+          <div id="sun0" class="preloader-el"></div>
+          <div id="sun1" class="preloader-el"></div>
+          <div id="moon" class="preloader-el"></div>
+          <p class="preloader-text"></p>
+        </div>
+      </div>
+      <navbar id="navbar"
+        ><div class="navbar-container">
+          <div class="navbar-logo">
+            <span class="stone-brand">石头中转站</span>
+            <img
+              class="navbar-logo-zer-letters"
+              src="./assets/images/logo/zer-letters.png"
+              alt=""
+              aria-hidden="true"
+            />
+            <img
+              class="navbar-logo-o-letters"
+              src="./assets/images/logo/zero-logo.png"
+              alt=""
+              aria-hidden="true"
+            />
+          </div>
+          <div class="navbar-sections">
+            <ul class="navbar-sections-items">
+              <li id="introLink" class="navbar-sections-item">
+                <div class="navbar-sections-item-wrapper">
+                  <span>01</span>
+                  <div class="navbar-sections-item-container">
+                    <p>1 介绍</p>
+                    <p>1 介绍</p>
+                  </div>
+                </div>
+              </li>
+              <li id="zeroOsLink" class="navbar-sections-item">
+                <div class="navbar-sections-item-wrapper">
+                  <span>02</span>
+                  <div class="navbar-sections-item-container">
+                    <p>2 模型</p>
+                    <p>2 模型</p>
+                  </div>
+                </div>
+              </li>
+              <li id="integrationsLink" class="navbar-sections-item">
+                <div class="navbar-sections-item-wrapper">
+                  <span>03</span>
+                  <div class="navbar-sections-item-container">
+                    <p>3 如何接入</p>
+                    <p>3 如何接入</p>
+                  </div>
+                </div>
+              </li>
+              <li
+                id="zeroIdLink"
+                class="navbar-sections-item"
+                style="display: none !important"
+              >
+                <div class="navbar-sections-item-wrapper">
+                  <span>04</span>
+                  <div class="navbar-sections-item-container">
+                    <p>控制台</p>
+                    <p>控制台</p>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div class="navbar-buttons">
+            <a
+              href="/home?auth=login"
+              target="_top"
+              rel="noreferrer"
+              onclick="return openStoneAuth('login')"
+              ><button
+                data-animation="button"
+                id="launchZeroBtn"
+                class="button button-blue"
+              >
+                <p class="button-text">登录</p>
+              </button> </a
+            ><button
+              data-animation="button"
+              id="hubBtn"
+              class="button button-white"
+              onclick="return openStoneAuth('register')"
+            >
+              <p class="button-text">注册</p>
+              <div class="hubBtn-dots">
+                <span class="hubBtn-dot"></span>
+                <span class="hubBtn-dot"></span>
+                <span class="hubBtn-dot"></span>
+                <span class="hubBtn-dot"></span>
+              </div>
+            </button>
+          </div></div></navbar
+      ><navbar id="mobileNavbar"
+        ><div class="mobile-navbar-container">
+          <ul class="mobile-navbar-items"></ul></div
+      ></navbar>
+      <div id="menu">
+        <div id="menu-closeContainer"></div>
+        <div class="menu-socials-wrapper">
+          <button id="closeMenu">
+            <img
+              src="/zero/assets/images/icons/ui/close-menu.png"
+              alt="close menu icon"
+            />
+          </button>
+          <ul class="menu-socials-links">
+            <li><p>导航</p></li>
+          </ul>
+        </div>
+        <div class="menu-wrapper">
+          <div class="menu-container">
+            <div class="menu-top-wrapper">
+              <div class="menu-top">
+                <h2 class="menu-title">石头中转站</h2>
+                <div class="menu-top-button-wrapper">
+                  <a
+                    href="/home?auth=register"
+                    target="_top"
+                    onclick="return openStoneAuth('register')"
+                    ><button
+                      data-animation="button-text-download"
+                      id="downloadAppBtn"
+                      class="button button-black"
+                    >
+                      <div class="menu-top-text-wrapper">
+                        <p>立即注册</p>
+                        <span></span>
+                        <p>立即注册</p>
+                        <span></span>
+                      </div></button
+                  ></a>
+                </div>
+              </div>
+            </div>
+            <div class="menu-categories"></div>
+            <div class="menu-copyright"><p>© 石头中转站</p></div>
+          </div>
+        </div>
+      </div>
+      <div id="zeroOsNavbar">
+        <div class="zeroOsNavbar-container">
+          <ul class="zeroOsNavbar-items">
+            <li
+              id="zeroOsNavbarChat"
+              class="zeroOsNavbar-item"
+              style="--delay: 0s"
+            >
+              <span></span>
+              <div class="zeroOsNavbar-item-text-wrapper">
+                <p>转发</p>
+                <p>转发</p>
+              </div>
+            </li>
+            <li
+              id="zeroOsNavbarTrade"
+              class="zeroOsNavbar-item"
+              style="--delay: 0.05s"
+            >
+              <span></span>
+              <div class="zeroOsNavbar-item-text-wrapper">
+                <p>模型</p>
+                <p>模型</p>
+              </div>
+            </li>
+            <li
+              id="zeroOsNavbarShare"
+              class="zeroOsNavbar-item"
+              style="--delay: 0.1s"
+            >
+              <span></span>
+              <div class="zeroOsNavbar-item-text-wrapper">
+                <p>密钥</p>
+                <p>密钥</p>
+              </div>
+            </li>
+            <li
+              id="zeroOsNavbarVote"
+              class="zeroOsNavbar-item"
+              style="--delay: 0.15s"
+            >
+              <span></span>
+              <div class="zeroOsNavbar-item-text-wrapper">
+                <p>监控</p>
+                <p>监控</p>
+              </div>
+            </li>
+            <li
+              id="zeroOsNavbarStake"
+              class="zeroOsNavbar-item"
+              style="--delay: 0.2s"
+            >
+              <span></span>
+              <div class="zeroOsNavbar-item-text-wrapper">
+                <p>订阅</p>
+                <p>订阅</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div id="quoteAppAnimation">
+        <div id="quoteAppCircles"></div>
+        <div id="quoteAppDots"><div class="dot middle-dot"></div></div>
+      </div>
+      <div id="sections">
+        <div id="intro" class="section">
+          <div id="intro-hero" class="subsection">
+            <div class="subsection-container">
+              <div class="intro-hero-title-wrapper">
+                <h1 data-animation="title" class="intro-hero-title">
+                  石头<br />中转站
+                </h1>
+                <div class="intro-hero-subtitle">
+                  <div class="intro-hero-decoration">
+                    <img
+                      src="/zero/assets/images/icons/intro/circle-moon.png"
+                      alt="decorative image"
+                    />
+                    <img
+                      src="/zero/assets/images/icons/intro/circle-dotted.png"
+                      alt="decorative image"
+                    />
+                    <img
+                      src="/zero/assets/images/icons/intro/circle-stroke.png"
+                      alt="decorative image"
+                    />
+                  </div>
+                  <p
+                    data-animation="description"
+                    data-delay="0.3"
+                    class="intro-hero-description"
+                  >
+                    一个面向开发者与团队的 AI API 中转入口，统一账号、
+                    统一密钥、统一用量，把模型接入变成可控的日常工作。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="intro-intro" class="subsection">
+            <div class="subsection-container">
+              <div class="intro-year-problem">
+                <div class="intro-year">
+                  <div class="intro-year-top">
+                    <p>// SERVICE</p>
+                    <button>2026</button>
+                  </div>
+                  <div class="intro-year-bottom">
+                    <div class="intro-year-bottom-up">
+                      <img
+                        src="/zero/assets/images/intro/intro-year.png"
+                        alt="illustrative image of year"
+                      />
+                      <h4>API</h4>
+                    </div>
+                    <div class="intro-year-bottom-down">
+                      <div class="timeline-image"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="intro-problem">
+                  <div class="intro-problem-top">
+                    <div class="intro-problem-top-decoration">
+                      <div class="intro-problem-decoration-circles">
+                        <img
+                          src="/zero/assets/images/icons/ui/double-circle.png"
+                          alt="decorative icon"
+                        />
+                      </div>
+                      <span>接入从这里收束</span>
+                    </div>
+                    <div class="intro-problem-top-buttons">
+                      <button id="introProblemBtn">痛点</button>
+                      <button id="introSolutionBtn">方案</button>
+                    </div>
+                  </div>
+                  <div class="intro-problem-bottom">
+                    <div class="intro-problem-bottom-wrapper">
+                      <p id="introProblem">
+                        多平台模型、多个密钥、不同额度和不稳定的上游，
+                        会让接入、排障和成本管理变得分散。
+                      </p>
+                      <p id="introSolution">
+                        石头中转站把模型请求、账号额度、订阅购买和状态监控
+                        放回同一个入口，让调用链路更清楚。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="intro-time" class="subsection">
+            <div class="subsection-container">
+              <div class="intro-sub-title --desktop">
+                <h4 class="intro-sub-title-left">
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--index-1">把分散的</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--index-2">模型接入</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--index-3">密钥额度</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--index-4">稳定性</span>
+                  </div>
+                </h4>
+                <h4 class="intro-sub-title-right">
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--index-1">集中管理</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--index-2">统一分发</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--index-3">持续观测</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--index-4">起来</span>
+                  </div>
+                </h4>
+              </div>
+              <div class="intro-sub-title --mobile">
+                <h4>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--mobile--index-1">统一模型接入</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--mobile--index-2">统一密钥额度</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--mobile--index-3">统一监控状态</span>
+                  </div>
+                </h4>
+                <h4>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--mobile--index-4"
+                      >让调用链路更清楚</span
+                    >
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--mobile--index-5">让成本消耗可追踪</span>
+                  </div>
+                  <div class="intro-sub-title-wrapper">
+                    <span class="line--mobile--index-6">让服务稳定交付</span>
+                  </div>
+                </h4>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="zeroOs" class="section">
+          <div id="zeroOs-hero" class="subsection">
+            <div class="subsection-container">
+              <div id="zeroOs-hero-os" class="subsection-container">
+                <h2 data-animation="title">AI API 中转站</h2>
+                <p data-animation="description" style="text-align: center">
+                  面向 OpenAI、Claude、Gemini 等模型接入场景，提供统一入口、
+                  账号分组、额度控制和请求观测。
+                </p>
+              </div>
+              <div id="zeroOs-hero-apps" class="subsection-container">
+                <div class="zeroOs-hero-apps-wrapper">
+                  <div class="zeroOs-hero-apps-header">
+                    <div class="zeroOs-hero-apps-decoration"></div>
+                    <h3>核心能力</h3>
+                    <h3>CLOSE</h3>
+                    <h3>CLOSE</h3>
+                  </div>
+                </div>
+                <div class="zeroOs-hero-apps-descriptions">
+                  <p data-id="native">
+                    从注册、订阅、密钥到调用监控，围绕 API 使用全流程设计
+                  </p>
+                </div>
+                <div class="zeroOs-hero-apps-icons"></div>
+              </div>
+            </div>
+          </div>
+          <div id="zeroOs-chat" class="subsection">
+            <div id="zeroOs-chat-hero" class="subsection-container">
+              <div class="subsection-container-icon">
+                <div class="subsection-container-icon-container">
+                  <img
+                    src="/zero/assets/images/icons/hero/chat-80.png"
+                    srcset="
+                      /zero/assets/images/icons/hero/chat-80.png   80w,
+                      /zero/assets/images/icons/hero/chat-120.png 120w
+                    "
+                    alt="illustrative icon"
+                  />
+                </div>
+              </div>
+              <h3 data-animation="title">
+                稳定转发每一次请求
+              </h3>
+              <h5 data-animation="description">
+                把上游模型能力收进一个更稳定的调用入口。
+              </h5>
+            </div>
+            <div id="zeroOs-chat-encrypted" class="subsection-container">
+              <div class="subsection-wrapper">
+                <h4 data-animation="title">统一接口，降低接入成本。</h4>
+                <p data-animation="description">
+                  应用只需要面向石头中转站发起请求，后续模型路由、账号策略
+                  和可用性调整都可以在平台侧完成。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>统一 API 入口，减少业务侧适配成本。</li>
+                    <li>支持按分组、账号和模型维度组织调用。</li>
+                    <li>请求失败时更容易定位上游、密钥或额度问题。</li>
+                    <li>适合个人项目、团队工具和自动化流程接入。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              id="zeroOs-chat-third-party"
+              class="subsection-container"
+              style="display: none"
+            >
+              <div class="subsection-wrapper">
+                <h4 data-animation="title">对接常用模型服务。</h4>
+                <p data-animation="description">
+                  把不同供应商和不同账号整理成可管理的模型资源池，业务侧
+                  不必反复改接入代码。
+                </p>
+              </div>
+              <div class="subsection-hero-icons">
+                <div>
+                  <div class="subsection-hero-icon-wrapper" style="--delay: 0s">
+                    <div class="subsection-hero-icon">
+                      <img
+                        src="/zero/assets/images/icons/zeroOs/chat.png"
+                        alt="model service icon"
+                      />
+                    </div>
+                    <div class="subsection-hero-text-wrapper">
+                      <p>OpenAI</p>
+                    </div>
+                  </div>
+                  <div
+                    class="subsection-hero-icon-wrapper"
+                    style="--delay: 0.1s"
+                  >
+                    <div class="subsection-hero-icon">
+                      <img
+                        src="/zero/assets/images/icons/zeroOs/share.png"
+                        alt="model service icon"
+                      />
+                    </div>
+                    <div class="subsection-hero-text-wrapper">
+                      <p>Claude</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="zeroOs-chat-video" class="subsection-container">
+              <div class="subsection-wrapper">
+                <h4 data-animation="title">
+                  让调用体验保持连贯。
+                </h4>
+                <p data-animation="description">
+                  从开发测试到线上请求，统一的转发入口能减少环境差异，
+                  也让团队更容易复用同一套调用规范。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>支持多种模型接口形态。</li>
+                    <li>前台注册后即可进入控制台配置密钥。</li>
+                    <li>后台仍保留原有账号、渠道和策略管理。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="zeroOs-trade" class="subsection">
+            <div id="zeroOs-trade-hero" class="subsection-container">
+              <div class="subsection-container-icon">
+                <div class="subsection-container-icon-container">
+                  <img
+                    src="/zero/assets/images/icons/hero/trade-80.png"
+                    srcset="
+                      /zero/assets/images/icons/hero/trade-80.png   80w,
+                      /zero/assets/images/icons/hero/trade-120.png 120w
+                    "
+                    alt="illustrative icon"
+                  />
+                </div>
+              </div>
+              <h3 data-animation="title">
+                集中管理可用模型
+              </h3>
+              <h5 data-animation="description">
+                看得见可用渠道，选得清调用方向。
+              </h5>
+            </div>
+            <div id="zeroOs-trade-future" class="subsection-container">
+              <div class="subsection-wrapper">
+                <h4 data-animation="title">模型资源集中收纳。</h4>
+                <p data-animation="description">
+                  不同上游、不同账号、不同模型放在同一套管理界面里，
+                  方便按业务场景选择更合适的调用资源。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>可查看可用渠道与模型状态。</li>
+                    <li>支持按分组控制不同用户的可用范围。</li>
+                    <li>模型、渠道和账号状态由后台统一维护。</li>
+                    <li>适配持续变化的模型生态。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              id="zeroOs-trade-experience"
+              class="subsection-container"
+              style="display: none"
+            >
+              <div class="subsection-wrapper">
+                <div class="subsection-container-header">
+                  <span>T</span> <span></span> <span>002</span>
+                </div>
+                <h4 data-animation="title">给不同业务选择不同模型。</h4>
+                <p data-animation="description">
+                  对话、写作、代码、图片或自动化任务，可以根据成本、速度和
+                  稳定性选择不同模型组合。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>按场景分配模型权限。</li>
+                    <li>按用户或用户组管理可用资源。</li>
+                    <li>减少业务代码里的模型判断逻辑。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              id="zeroOs-trade-launch"
+              class="subsection-container"
+              style="display: none"
+            >
+              <div class="subsection-wrapper">
+                <div class="subsection-container-header">
+                  <span>T</span> <span></span> <span>003</span>
+                </div>
+                <h4 data-animation="title">
+                  更轻地接入新上游。
+                </h4>
+                <p data-animation="description">
+                  后台维护渠道和账号，前台应用继续使用统一入口，新增模型时
+                  不必让所有项目跟着改造。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>
+                      新渠道由后台集中配置。
+                    </li>
+                    <li>
+                      调用方保留稳定的接入方式。
+                    </li>
+                    <li>
+                      权限、额度和计费策略可继续沿用。
+                    </li>
+                    <li>上线新模型时减少重复接入成本。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="zeroOs-share" class="subsection">
+            <div id="zeroOs-share-hero" class="subsection-container">
+              <div class="subsection-container-icon">
+                <div class="subsection-container-icon-container">
+                  <img
+                    src="/zero/assets/images/icons/hero/share-80.png"
+                    srcset="
+                      /zero/assets/images/icons/hero/share-80.png   80w,
+                      /zero/assets/images/icons/hero/share-120.png 120w
+                    "
+                    alt="illustrative icon"
+                  />
+                </div>
+              </div>
+              <h3 data-animation="title">
+                密钥、额度和用户都能管清楚
+                <h5 data-animation="description">
+                  注册后进入控制台，创建密钥、查看额度、按需管理自己的调用。
+                </h5>
+              </h3>
+            </div>
+            <div id="zeroOs-share-proof" class="subsection-container">
+              <div class="subsection-wrapper">
+                <h4 data-animation="title">把 API Key 当成资产管理。</h4>
+                <p data-animation="description">
+                  每个用户都可以维护自己的调用密钥，管理员可以在后台处理
+                  用户、分组、余额和权限策略。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>用户可在控制台创建和管理 API Key。</li>
+                    <li>支持余额、分组和订阅关联。</li>
+                    <li>管理员可统一维护用户和权限。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              id="zeroOs-share-enhance"
+              class="subsection-container"
+              style="display: none"
+            >
+              <div class="subsection-wrapper">
+                <div class="subsection-container-header">
+                  <span>S</span> <span></span> <span>002</span>
+                </div>
+                <h4 data-animation="title">
+                  权限边界更清晰。
+                </h4>
+                <p data-animation="description">
+                  用户能使用哪些模型、拥有多少额度、走哪些渠道，都可以通过
+                  平台策略控制。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>
+                      按用户组配置可用模型范围。
+                    </li>
+                    <li>
+                      按订阅和余额控制使用权益。
+                    </li>
+                    <li>
+                      管理员可以审查用户、密钥和渠道状态。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              id="zeroOs-share-healthier"
+              class="subsection-container"
+              style="display: none"
+            >
+              <div class="subsection-wrapper">
+                <div class="subsection-container-header">
+                  <span>S</span> <span></span> <span>003</span>
+                </div>
+                <h4 data-animation="title">用量记录可追踪。</h4>
+                <p data-animation="description">
+                  请求消耗和使用趋势集中呈现，方便定位异常调用，也方便
+                  做成本复盘。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>
+                      查看密钥维度的调用记录。
+                    </li>
+                    <li>
+                      追踪用户和分组维度的消耗。
+                    </li>
+                    <li>让异常用量更早暴露。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="zeroOs-vote" class="subsection">
+            <div id="zeroOs-vote-hero" class="subsection-container">
+              <div class="subsection-container-icon">
+                <div class="subsection-container-icon-container">
+                  <img
+                    src="/zero/assets/images/icons/hero/vote-80.png"
+                    srcset="
+                      /zero/assets/images/icons/hero/vote-80.png   80w,
+                      /zero/assets/images/icons/hero/vote-120.png 120w
+                    "
+                    alt="illustrative icon"
+                  />
+                </div>
+              </div>
+              <h3 data-animation="title">实时关注渠道状态</h3>
+              <h5 data-animation="description">
+                从可用性、错误、延迟和渠道健康度判断服务是否稳定。
+              </h5>
+            </div>
+            <div id="zeroOs-vote-choices" class="subsection-container">
+              <div class="subsection-wrapper">
+                <h4 data-animation="title">监控不是摆设，是排障入口。</h4>
+                <p data-animation="description">
+                  当模型请求异常时，你需要知道问题来自密钥、上游、网络还是
+                  配额。石头中转站把这些信号放到同一个后台。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>渠道状态可查看。</li>
+                    <li>错误透传和异常信息更容易定位。</li>
+                    <li>管理员可维护监控规则和告警相关设置。</li>
+                    <li>用户可查看公开的服务状态页面。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              id="zeroOs-vote-join"
+              class="subsection-container"
+              style="display: none"
+            >
+              <div class="subsection-wrapper">
+                <div class="subsection-container-header">
+                  <span>V</span> <span></span> <span>002</span>
+                </div>
+                <h4 data-animation="title">
+                  更快定位异常请求。
+                </h4>
+                <p data-animation="description">
+                  面对上游波动或账号异常，不需要逐个项目排查，先从统一监控
+                  入口确认链路状态。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>按渠道查看健康状态。</li>
+                    <li>结合日志判断失败原因。</li>
+                    <li>减少盲目重试和重复排查。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              id="zeroOs-vote-limit"
+              class="subsection-container"
+              style="display: none"
+            >
+              <div class="subsection-wrapper">
+                <div class="subsection-container-header">
+                  <span>V</span> <span></span> <span>003</span>
+                </div>
+                <h4 data-animation="title">
+                  让状态对用户更透明。
+                </h4>
+                <p data-animation="description">
+                  公开状态页可以让用户知道当前服务是否可用，减少无效沟通。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>
+                      用户可访问状态页。
+                    </li>
+                    <li>
+                      管理员可维护渠道监控。
+                    </li>
+                    <li>
+                      异常时更容易给出明确说明。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="zeroOs-stake" class="subsection">
+            <div id="zeroOs-stake-hero" class="subsection-container">
+              <div class="subsection-container-icon">
+                <div class="subsection-container-icon-container">
+                  <img
+                    src="/zero/assets/images/icons/hero/stake-80.png"
+                    srcset="
+                      /zero/assets/images/icons/hero/stake-80.png   80w,
+                      /zero/assets/images/icons/hero/stake-120.png 120w
+                    "
+                    alt="illustrative icon"
+                  />
+                </div>
+              </div>
+              <h3 data-animation="title">
+                订阅与计费保持简单
+              </h3>
+              <h5 data-animation="description">
+                从注册、购买到使用额度，尽量让用户自己完成闭环。
+              </h5>
+            </div>
+            <div id="zeroOs-stake-earn" class="subsection-container">
+              <div class="subsection-wrapper">
+                <h4 data-animation="title">按需购买，按量使用。</h4>
+                <p data-animation="description">
+                  订阅、订单、余额和兑换码等能力保留在原系统里，访客官网只
+                  负责把用户引到正确入口。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>注册后可进入订阅与购买流程。</li>
+                    <li>支持余额、订单和兑换码等原有能力。</li>
+                    <li>额度消耗可在控制台查看。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              id="zeroOs-stake-reward"
+              class="subsection-container"
+              style="visibility: hidden"
+            >
+              <div class="subsection-wrapper">
+                <div class="subsection-container-header">
+                  <span>S</span> <span></span> <span>002</span>
+                </div>
+                <h4 data-animation="title">给团队留出管理空间。</h4>
+                <p data-animation="description">
+                  管理员可以维护套餐、用户、分组和渠道配置，访客官网不改变
+                  后台工作流。
+                </p>
+                <div
+                  data-animation="list"
+                  class="subsection-container-list-wrapper"
+                >
+                  <div class="subsection-container-list-header">
+                    <h6 class="subsection-container-list-title">
+                      能力细节
+                    </h6>
+                    <div class="subsection-container-list-decoration">
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <img
+                        src="/zero/assets/images/decoration/triangle.png"
+                        alt="decorative triangle"
+                      />
+                      <span></span>
+                    </div>
+                  </div>
+                  <ul>
+                    <li>后台仍负责套餐与订单管理。</li>
+                    <li>用户侧聚焦购买和使用。</li>
+                    <li>上线前可继续按原系统配置规则。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="integrations" class="section">
+          <div id="integrations-hero" class="subsection">
+            <div class="subsection-container">
+              <div class="integration-hero-header">
+                <div class="integration-hero-header-decoration">
+                  <img
+                    src="/zero/assets/images/icons/ui/double-rectangle.png"
+                    alt="double rectangle"
+                  />
+                </div>
+                <h6>接入流程</h6>
+              </div>
+              <h2 data-animation="title">
+                注册账号，创建密钥，然后把请求接到石头中转站
+              </h2>
+              <div class="integration-hero-switch-wrapper">
+                <p class="integration-hero-switch-text-3 --active">API</p>
+                <div class="integration-hero-switch --web3">
+                  <span class="integration-hero-switch-inner"></span>
+                </div>
+                <p class="integration-hero-switch-text-2">KEY</p>
+              </div>
+              <div class="integration-hero-icons-wrapper">
+                <div class="integration-hero-icons-web3"></div>
+                <div class="integration-hero-icons-web2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="zeroId" class="section">
+          <div id="zeroId-hero" class="subsection">
+            <div class="subsection-container">
+              <div class="zeroId-hero-header">
+                <div class="zeroId-hero-header-decoration">
+                  <img
+                    src="/zero/assets/images/icons/zeroId/header-rectangle.png"
+                    alt="zero-id rectangle"
+                  />
+                </div>
+                <h6>控制台</h6>
+              </div>
+              <h2 data-animation="title">登录后进入真正的使用入口</h2>
+              <div class="zeroId-hero-explanations">
+                <div class="zeroId-hero-explanation">
+                  <img
+                    src="/zero/assets/images/icons/zeroId/citizenship.png"
+                    alt="user account illustration"
+                  />
+                  <p>
+                    注册账号后进入用户控制台，创建 API Key，查看余额、订阅
+                    和用量。
+                  </p>
+                </div>
+                <div class="zeroId-hero-explanation">
+                  <img
+                    src="/zero/assets/images/icons/zeroId/identity.png"
+                    alt="api key illustration"
+                  />
+                  <p>
+                    根据业务需要选择可用模型，把密钥放进你的应用、脚本或
+                    自动化流程。
+                  </p>
+                </div>
+                <div class="zeroId-hero-explanation">
+                  <img
+                    src="/zero/assets/images/icons/zeroId/wallet.png"
+                    alt="usage dashboard illustration"
+                  />
+                  <p>
+                    通过用量、订单和状态页面持续确认调用是否健康，费用是否
+                    可控。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <footer id="footer" class="section">
+          <div id="footer-footer" class="subsection">
+            <div class="subsection-container">
+              <h2 data-animation="title">开始使用石头中转站。</h2>
+              <p class="footer-footer-description">
+                已有账号直接登录，新用户先注册。官网只负责介绍和入口，
+                真正的密钥、订阅、监控都在控制台里完成。
+              </p>
+              <div class="footer-footer-buttons">
+                <a
+                  href="/home?auth=login"
+                  target="_top"
+                  rel="noreferrer"
+                  onclick="return openStoneAuth('login')"
+                  ><button
+                    data-animation="button-text"
+                    class="button button-transparent"
+                  >
+                    <p>登录控制台</p>
+                    <img
+                      src="/zero/assets/images/icons/layout/white-arrow.png"
+                      alt="white arrow"
+                    />
+                  </button> </a
+                ><button
+                  id="launch-world-btn"
+                  data-animation="button-text"
+                  class="button button-white"
+                  onclick="return openStoneAuth('register')"
+                >
+                  <p>注册账号</p>
+                  <img
+                    src="/zero/assets/images/icons/layout/black-arrow.png"
+                    alt="black arrow"
+                  />
+                </button>
+              </div>
+              <div class="footer-footer-socials">
+                <p class="footer-footer-copyrights">© 石头中转站</p>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
+      <div id="layout">
+        <div class="layout-container">
+          <div class="layout-top"></div>
+          <div class="layout-bottom">
+            <div class="layout-discover-now">
+              <button>
+                <img
+                  src="/zero/assets/images/icons/layout/discover-now.png"
+                  alt="discover now image"
+                />
+              </button>
+              <div class="layout-discover-text-wrapper">
+                <p>继续了解</p>
+              </div>
+            </div>
+            <a href="#" style="display: none !important"
+              ><div class="layout-stock-market">
+                <div class="layout-stock-top">
+                  <p>Stone API</p>
+                  <img src="" />
+                </div>
+                <div class="layout-stock-bottom">
+                  <p>API</p>
+                  <span>(READY)</span>
+                </div>
+              </div></a
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="not-supported-container">
+      <div class="not-supported--content" id="ns-device">
+        <span>Not supported device</span>
+      </div>
+      <div class="not-supported--content" id="ns-browser">
+        <span>Not supported browser</span>
+      </div>
+      <div class="not-supported--content" id="ns-webgl">
+        <span>Not supported WebGL</span>
+      </div>
+      <div class="not-supported--content" id="ns-orientation">
+        <span>Not supported orientation</span>
+      </div>
+    </div>
+  </body>
+</html>

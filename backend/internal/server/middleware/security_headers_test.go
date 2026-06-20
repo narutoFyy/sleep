@@ -93,7 +93,7 @@ func TestSecurityHeaders(t *testing.T) {
 		middleware(c)
 
 		assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
-		assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"))
+		assert.Equal(t, "SAMEORIGIN", w.Header().Get("X-Frame-Options"))
 		assert.Equal(t, "strict-origin-when-cross-origin", w.Header().Get("Referrer-Policy"))
 	})
 
@@ -145,10 +145,49 @@ func TestSecurityHeaders(t *testing.T) {
 		middleware(c)
 
 		assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
-		assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"))
+		assert.Equal(t, "SAMEORIGIN", w.Header().Get("X-Frame-Options"))
 		assert.Equal(t, "strict-origin-when-cross-origin", w.Header().Get("Referrer-Policy"))
 		assert.Empty(t, w.Header().Get("Content-Security-Policy"))
 		assert.Empty(t, GetNonceFromContext(c))
+	})
+
+	t.Run("omits_x_frame_options_when_frame_ancestors_allows_anywhere", func(t *testing.T) {
+		cfg := config.CSPConfig{
+			Enabled: true,
+			Policy:  "default-src 'self'; frame-ancestors *",
+		}
+		middleware := SecurityHeaders(cfg, nil)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+		middleware(c)
+
+		assert.Empty(t, w.Header().Get("X-Frame-Options"))
+		assert.Contains(t, w.Header().Get("Content-Security-Policy"), "frame-ancestors *")
+	})
+
+	t.Run("zero_frontend_uses_relaxed_csp_without_nonce", func(t *testing.T) {
+		cfg := config.CSPConfig{
+			Enabled: true,
+			Policy:  config.DefaultCSPPolicy,
+		}
+		middleware := SecurityHeaders(cfg, nil)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/zero/index.html", nil)
+
+		middleware(c)
+
+		csp := w.Header().Get("Content-Security-Policy")
+		assert.Empty(t, w.Header().Get("X-Frame-Options"))
+		assert.Empty(t, GetNonceFromContext(c))
+		assert.Contains(t, csp, "script-src 'self' 'unsafe-inline' 'unsafe-eval'")
+		assert.Contains(t, csp, "font-src 'self' data: https://fonts.gstatic.com https://use.typekit.net")
+		assert.Contains(t, csp, "frame-ancestors *")
+		assert.NotContains(t, csp, "'nonce-")
 	})
 
 	t.Run("csp_enabled_with_nonce_placeholder", func(t *testing.T) {

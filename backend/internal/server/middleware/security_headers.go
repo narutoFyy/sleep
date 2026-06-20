@@ -28,6 +28,9 @@ const (
 	AirwallexDemoStaticDomain = "https://static-demo.airwallex.com"
 	// AirwallexDemoCheckoutDomain 是 Airwallex 沙箱环境收银台元素和 iframe 域名。
 	AirwallexDemoCheckoutDomain = "https://checkout-demo.airwallex.com"
+	// zeroFrontendCSPPolicy is intentionally relaxed for the bundled Zero landing page,
+	// which contains legacy inline scripts and external font assets.
+	zeroFrontendCSPPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com https://use.typekit.net; connect-src 'self' https:; frame-src 'self' https:; frame-ancestors *; base-uri 'self'; form-action 'self'"
 )
 
 var requiredCSPDirectiveValues = []struct {
@@ -36,6 +39,7 @@ var requiredCSPDirectiveValues = []struct {
 }{
 	{"script-src", CloudflareInsightsDomain},
 	{"script-src", StripeDomain},
+	{"frame-src", "'self'"},
 	{"frame-src", StripeDomain},
 	{"script-src", AirwallexStaticDomain},
 	{"script-src", AirwallexCheckoutDomain},
@@ -83,7 +87,9 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 
 	return func(c *gin.Context) {
 		finalPolicy := policy
-		if getFrameSrcOrigins != nil {
+		if isZeroFrontendPath(c) {
+			finalPolicy = zeroFrontendCSPPolicy
+		} else if getFrameSrcOrigins != nil {
 			for _, origin := range getFrameSrcOrigins() {
 				if origin != "" {
 					finalPolicy = addToDirective(finalPolicy, "frame-src", origin)
@@ -92,7 +98,9 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 		}
 
 		c.Header("X-Content-Type-Options", "nosniff")
-		c.Header("X-Frame-Options", "DENY")
+		if !cfg.Enabled || shouldSendXFrameOptions(finalPolicy) {
+			c.Header("X-Frame-Options", "SAMEORIGIN")
+		}
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		if isAPIRoutePath(c) {
 			c.Next()
@@ -100,19 +108,31 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 		}
 
 		if cfg.Enabled {
-			// Generate nonce for this request
-			nonce, err := GenerateNonce()
-			if err != nil {
-				// crypto/rand 失败时降级为无 nonce 的 CSP 策略
-				log.Printf("[SecurityHeaders] %v — 降级为无 nonce 的 CSP", err)
-				c.Header("Content-Security-Policy", strings.ReplaceAll(finalPolicy, NonceTemplate, "'unsafe-inline'"))
+			if strings.Contains(finalPolicy, NonceTemplate) {
+				// Generate nonce for this request
+				nonce, err := GenerateNonce()
+				if err != nil {
+					// crypto/rand 失败时降级为无 nonce 的 CSP 策略
+					log.Printf("[SecurityHeaders] %v — 降级为无 nonce 的 CSP", err)
+					c.Header("Content-Security-Policy", strings.ReplaceAll(finalPolicy, NonceTemplate, "'unsafe-inline'"))
+				} else {
+					c.Set(CSPNonceKey, nonce)
+					c.Header("Content-Security-Policy", strings.ReplaceAll(finalPolicy, NonceTemplate, "'nonce-"+nonce+"'"))
+				}
 			} else {
-				c.Set(CSPNonceKey, nonce)
-				c.Header("Content-Security-Policy", strings.ReplaceAll(finalPolicy, NonceTemplate, "'nonce-"+nonce+"'"))
+				c.Header("Content-Security-Policy", finalPolicy)
 			}
 		}
 		c.Next()
 	}
+}
+
+func isZeroFrontendPath(c *gin.Context) bool {
+	if c == nil || c.Request == nil || c.Request.URL == nil {
+		return false
+	}
+	path := c.Request.URL.Path
+	return path == "/zero" || strings.HasPrefix(path, "/zero/")
 }
 
 func isAPIRoutePath(c *gin.Context) bool {
@@ -125,6 +145,10 @@ func isAPIRoutePath(c *gin.Context) bool {
 		strings.HasPrefix(path, "/antigravity/") ||
 		strings.HasPrefix(path, "/responses") ||
 		strings.HasPrefix(path, "/images")
+}
+
+func shouldSendXFrameOptions(policy string) bool {
+	return !directiveHasValue(policy, "frame-ancestors", "*")
 }
 
 // enhanceCSPPolicy 确保 CSP 策略包含 nonce 支持和支付 SDK 必需域名。

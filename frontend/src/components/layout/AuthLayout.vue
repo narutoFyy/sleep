@@ -1,28 +1,6 @@
 <template>
-  <div class="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
-    <!-- Background -->
-    <div
-      class="absolute inset-0 bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
-    ></div>
-
-    <!-- Decorative Elements -->
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <!-- Gradient Orbs -->
-      <div
-        class="absolute -right-40 -top-40 h-80 w-80 rounded-full bg-primary-400/20 blur-3xl"
-      ></div>
-      <div
-        class="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-primary-500/15 blur-3xl"
-      ></div>
-      <div
-        class="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-300/10 blur-3xl"
-      ></div>
-
-      <!-- Grid Pattern -->
-      <div
-        class="absolute inset-0 bg-[linear-gradient(rgba(20,184,166,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
-      ></div>
-    </div>
+  <div class="auth-tech-shell relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+    <div class="auth-tech-grid" aria-hidden="true"></div>
 
     <!-- Content Container -->
     <div class="relative z-10 w-full max-w-md">
@@ -30,22 +8,20 @@
       <div class="mb-8 text-center">
         <!-- Custom Logo or Default Logo -->
         <template v-if="settingsLoaded">
-          <div
-            class="mb-4 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-primary-500/30"
-          >
-            <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
+          <div class="auth-logo-chip mb-4 inline-flex h-20 w-20 items-center justify-center overflow-hidden">
+            <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-cover" />
           </div>
-          <h1 class="text-gradient mb-2 text-3xl font-bold">
+          <h1 class="text-gradient mb-2 text-3xl font-bold tracking-tight">
             {{ siteName }}
           </h1>
-          <p class="text-sm text-gray-500 dark:text-dark-400">
+          <p class="text-sm text-[var(--stone-text-soft)]">
             {{ siteSubtitle }}
           </p>
         </template>
       </div>
 
       <!-- Card Container -->
-      <div class="card-glass rounded-2xl p-8 shadow-glass">
+      <div ref="cardRef" class="auth-card-glass p-8">
         <slot />
       </div>
 
@@ -63,26 +39,50 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import gsap from 'gsap'
 import { useAppStore } from '@/stores'
+import { normalizeSiteName } from '@/stores/app'
 import { sanitizeUrl } from '@/utils/url'
 
 const appStore = useAppStore()
+const cardRef = ref<HTMLElement | null>(null)
+let authAnimation: ReturnType<typeof gsap.context> | null = null
 
-const siteName = computed(() => appStore.siteName || 'Sub2API')
+const siteName = computed(() => normalizeSiteName(appStore.siteName))
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'Subscription to API Conversion Platform')
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 
 const currentYear = computed(() => new Date().getFullYear())
 
-onMounted(() => {
+function animateAuthCard() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !cardRef.value) return
+
+  authAnimation = gsap.context(() => {
+    gsap.from(cardRef.value, {
+      y: 14,
+      opacity: 0,
+      duration: 0.42,
+      ease: 'power3.out',
+      clearProps: 'transform,opacity'
+    })
+  }, cardRef.value)
+}
+
+onMounted(async () => {
   appStore.fetchPublicSettings()
+  await nextTick()
+  animateAuthCard()
+})
+
+onBeforeUnmount(() => {
+  authAnimation?.revert()
 })
 </script>
 
 <style scoped>
 .text-gradient {
-  @apply bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent;
+  @apply text-primary-600 dark:text-primary-300;
 }
 </style>

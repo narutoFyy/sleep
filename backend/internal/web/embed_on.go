@@ -115,6 +115,17 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 }
 
 func (s *FrontendServer) fileExists(path string) bool {
+	// io/fs (the embed FS) rejects paths with a trailing slash with
+	// "invalid argument". A request like "/zero/" (which http.FileServer
+	// produces when redirecting "/zero/index.html") arrives here as "zero/";
+	// without trimming, Open fails and the caller wrongly treats the existing
+	// directory as a missing path, falling back to the SPA index.html and
+	// breaking embedded sub-pages. Trim the trailing slash so the directory
+	// is detected and served by http.FileServer (which returns its index.html).
+	path = strings.TrimSuffix(path, "/")
+	if path == "" {
+		return false
+	}
 	file, err := s.distFS.Open(path)
 	if err != nil {
 		return false
@@ -146,18 +157,13 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	// Check cache first
 	cached := s.cache.Get()
 	if cached != nil {
-		// Check If-None-Match for 304 response
-		if match := c.GetHeader("If-None-Match"); match == cached.ETag {
-			c.Status(http.StatusNotModified)
-			c.Abort()
-			return
-		}
-
-		// Replace nonce placeholder with actual nonce before serving
+		// index.html carries a per-request CSP nonce, so it MUST NOT be
+		// browser-cached. ETag/304 would let the browser reuse stale HTML whose
+		// nonce no longer matches the freshly generated CSP header nonce,
+		// breaking every inline script. Always serve a full body with no-store.
 		content := replaceNoncePlaceholder(cached.Content, nonce)
 
-		c.Header("ETag", cached.ETag)
-		c.Header("Cache-Control", "no-cache") // Must revalidate
+		c.Header("Cache-Control", "no-store")
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 		c.Abort()
 		return
@@ -189,11 +195,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	// Replace nonce placeholder with actual nonce before serving
 	content := replaceNoncePlaceholder(rendered, nonce)
 
-	cached = s.cache.Get()
-	if cached != nil {
-		c.Header("ETag", cached.ETag)
-	}
-	c.Header("Cache-Control", "no-cache")
+	c.Header("Cache-Control", "no-store")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	c.Abort()
 }

@@ -4,16 +4,27 @@
 
 @layer base {
   * {
-    @apply border-gray-200 dark:border-dark-700;
+    @apply border-slate-200 dark:border-primary-900;
   }
 
   html {
     @apply scroll-smooth antialiased;
+    color-scheme: light;
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 dark:bg-dark-950 dark:text-gray-100;
-    @apply min-h-screen;
+    @apply min-h-screen bg-[#f6fbff] text-accent-800 dark:bg-dark-950 dark:text-[#d8f7ff];
+    background-image:
+      radial-gradient(circle at top left, rgba(34, 211, 238, 0.12), transparent 32%),
+      radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.08), transparent 28%),
+      linear-gradient(180deg, rgba(247,251,255,0.86), rgba(239,248,255,0.98));
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.12), transparent 26%),
+      linear-gradient(180deg, rgba(20,35,48,0.98), rgba(9,20,30,1));
   }
 
   /* 自定义滚动条 - 仅针对 Firefox，避免 Chrome 取消 webkit 的全局定制 */
@@ -48,7 +59,7 @@
   }
 
   *:hover::-webkit-scrollbar-thumb {
-    @apply bg-gray-300/50 dark:bg-dark-600/50;
+    @apply bg-gray-300 dark:bg-dark-600;
   }
 
   *:hover::-webkit-scrollbar-thumb:hover {
@@ -57,7 +68,24 @@
 
   /* 选中文本样式 */
   ::selection {
-    @apply bg-primary-500/20 text-primary-900 dark:text-primary-100;
+    @apply bg-primary-300 text-primary-950 dark:bg-primary-500 dark:text-[#ecfeff];
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-serif tracking-[0.01em] text-accent-900 dark:text-[#e2f9ff];
+  }
+
+  ::placeholder {
+    color: rgba(71, 121, 147, 0.68);
+  }
+
+  .dark ::placeholder {
+    color: rgba(210, 231, 242, 0.42);
   }
 
 
@@ -67,31 +95,31 @@
   /* ============ 按钮样式 ============ */
   .btn {
     @apply inline-flex items-center justify-center gap-2;
-    @apply rounded-xl px-4 py-2.5 text-sm font-medium;
-    @apply transition-all duration-200 ease-out;
-    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2;
+    @apply rounded-2xl px-5 py-3 text-sm font-medium;
+    @apply transition-all duration-300 ease-out;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-400/45 focus:ring-offset-2 focus:ring-offset-[#f6fbff] dark:focus:ring-offset-dark-900;
     @apply disabled:transform-none disabled:cursor-not-allowed disabled:opacity-50;
     @apply active:scale-[0.98];
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-500 to-primary-600;
-    @apply text-white shadow-md shadow-primary-500/25;
-    @apply hover:from-primary-600 hover:to-primary-700 hover:shadow-lg hover:shadow-primary-500/30;
+    @apply bg-gradient-to-r from-primary-400 via-primary-500 to-primary-600;
+    @apply text-[#ecfeff] shadow-[0_14px_32px_rgba(8,51,68,0.16)];
+    @apply hover:-translate-y-0.5 hover:from-primary-300 hover:via-primary-500 hover:to-primary-600 hover:shadow-[0_20px_36px_rgba(8,51,68,0.24)];
     @apply dark:shadow-primary-500/20;
   }
 
   .btn-secondary {
     @apply bg-white dark:bg-dark-800;
-    @apply text-gray-700 dark:text-gray-200;
-    @apply border border-gray-200 dark:border-dark-600;
-    @apply shadow-sm hover:bg-gray-50 dark:hover:bg-dark-700;
-    @apply hover:border-gray-300 dark:hover:border-dark-500;
+    @apply text-accent-800 dark:text-[#e1f7ff];
+    @apply border border-primary-300 dark:border-primary-900;
+    @apply shadow-[0_8px_24px_rgba(8,51,68,0.08)] hover:bg-[#f0fbff] dark:hover:bg-dark-700;
+    @apply hover:border-primary-400 dark:hover:border-primary-700;
   }
 
   .btn-ghost {
-    @apply bg-transparent text-gray-600 dark:text-gray-300;
-    @apply hover:bg-gray-100 dark:hover:bg-dark-800;
+    @apply bg-transparent text-accent-700 dark:text-[#cfeeff];
+    @apply hover:bg-primary-100 dark:hover:bg-primary-950;
   }
 
   .btn-danger {
@@ -160,14 +188,14 @@
 
   /* ============ 输入框样式 ============ */
   .input {
-    @apply w-full rounded-xl px-4 py-2.5 text-sm;
+    @apply w-full rounded-2xl px-4 py-3 text-sm;
     @apply bg-white dark:bg-dark-800;
-    @apply border border-gray-200 dark:border-dark-600;
-    @apply text-gray-900 dark:text-gray-100;
+    @apply border border-primary-300 dark:border-primary-900;
+    @apply text-accent-800 dark:text-[#d8f7ff];
     @apply placeholder:text-gray-400 dark:placeholder:text-dark-400;
     @apply transition-all duration-200;
-    @apply focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30;
-    @apply disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-dark-900;
+    @apply focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-400/25;
+    @apply disabled:cursor-not-allowed disabled:bg-[#e8f3fa] dark:disabled:bg-dark-900;
   }
 
   .input-error {
@@ -199,50 +227,55 @@
 
   /* ============ 玻璃效果 ============ */
   .glass {
-    @apply bg-white/80 backdrop-blur-xl dark:bg-dark-800/80;
+    @apply bg-white/80 dark:bg-dark-800/40;
   }
 
   .glass-card {
-    @apply bg-white/70 dark:bg-dark-800/70;
-    @apply backdrop-blur-xl;
-    @apply rounded-2xl;
-    @apply border border-white/20 dark:border-dark-700/50;
+    @apply bg-white/70 dark:bg-dark-800/40;
+    @apply rounded-[1.5rem];
+    @apply border border-primary-300 dark:border-primary-900/50;
     @apply shadow-glass;
     @apply transition-all duration-300;
   }
 
   /* ============ 卡片样式 ============ */
   .card {
-    @apply bg-white dark:bg-dark-800/50;
-    @apply rounded-2xl;
-    @apply border border-gray-100 dark:border-dark-700/50;
+    @apply bg-white/80 dark:bg-dark-800/40;
+    @apply rounded-[1.5rem];
+    @apply border border-primary-200 dark:border-primary-900/50;
     @apply shadow-card;
     @apply transition-all duration-300;
   }
 
   .card-hover {
-    @apply hover:-translate-y-0.5 hover:shadow-card-hover;
-    @apply hover:border-gray-200 dark:hover:border-dark-600;
+    @apply hover:-translate-y-1 hover:shadow-card-hover;
+    @apply hover:border-primary-300 dark:hover:border-primary-800/60;
   }
 
   .card-glass {
-    @apply bg-white/70 dark:bg-dark-800/70;
-    @apply backdrop-blur-xl;
-    @apply border border-white/20 dark:border-dark-700/50;
+    @apply bg-white/70 dark:bg-dark-800/40;
+    @apply border border-primary-300 dark:border-primary-900/50;
     @apply shadow-glass;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .card-glass:hover {
+    @apply border-blue-400/40 dark:border-blue-500/50;
+    box-shadow: 0 8px 32px -4px rgba(59, 130, 246, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.05);
+    transform: translateY(-2px);
   }
 
   .card-header {
-    @apply border-b border-gray-100 dark:border-dark-700;
+    @apply border-b border-primary-200 dark:border-primary-900;
     @apply px-6 py-4;
   }
 
   .card-body {
-    @apply p-6;
+    @apply p-7;
   }
 
   .card-footer {
-    @apply border-t border-gray-100 dark:border-dark-700;
+    @apply border-t border-primary-200 dark:border-primary-900;
     @apply px-6 py-4;
   }
 
@@ -259,7 +292,7 @@
   }
 
   .stat-icon-primary {
-    @apply bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400;
+    @apply bg-primary-100 text-primary-600 dark:bg-primary-900 dark:text-primary-400;
   }
 
   .stat-icon-success {
@@ -296,7 +329,8 @@
 
   /* ============ 表格样式 ============ */
   .table-container {
-    @apply overflow-x-auto rounded-xl border border-gray-200 dark:border-dark-700;
+    @apply overflow-x-auto rounded-2xl border border-primary-300 bg-white dark:border-primary-900 dark:bg-dark-900;
+    box-shadow: 0 18px 42px rgba(8, 51, 68, 0.08);
   }
 
   .table {
@@ -304,16 +338,17 @@
   }
 
   .table th {
-    @apply px-4 py-3 text-left font-medium;
-    @apply text-gray-600 dark:text-dark-300;
-    @apply bg-gray-50 dark:bg-dark-800/50;
-    @apply border-b border-gray-200 dark:border-dark-700;
+    @apply px-5 py-4 text-left font-medium uppercase tracking-[0.08em];
+    @apply text-accent-600 dark:text-[#c7ebf8];
+    @apply bg-[#f3faff] dark:bg-dark-800;
+    @apply border-b border-primary-200 dark:border-primary-900;
+    font-size: 0.72rem;
   }
 
   .table td {
-    @apply px-4 py-3;
-    @apply text-gray-700 dark:text-gray-300;
-    @apply border-b border-gray-100 dark:border-dark-800;
+    @apply px-5 py-4;
+    @apply text-accent-800 dark:text-[#def5ff];
+    @apply border-b border-primary-200 dark:border-primary-900;
   }
 
   .table tr:last-child td {
@@ -322,7 +357,7 @@
 
   .table tbody tr {
     @apply transition-colors duration-150;
-    @apply hover:bg-gray-50 dark:hover:bg-dark-800/30;
+    @apply hover:bg-primary-50 dark:hover:bg-primary-950;
   }
 
   /* ============ 徽章样式 ============ */
@@ -332,7 +367,7 @@
   }
 
   .badge-primary {
-    @apply bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400;
+    @apply bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-400;
   }
 
   .badge-success {
@@ -368,8 +403,8 @@
 
   .dropdown-item {
     @apply px-4 py-2 text-sm;
-    @apply text-gray-700 dark:text-gray-300;
-    @apply hover:bg-gray-100 dark:hover:bg-dark-700;
+    @apply text-accent-800 dark:text-[#d6f2ff];
+    @apply hover:bg-primary-50 dark:hover:bg-primary-950;
     @apply cursor-pointer transition-colors;
     @apply flex items-center gap-2;
   }
@@ -377,7 +412,7 @@
   /* ============ 模态框 ============ */
   .modal-overlay {
     @apply fixed inset-0 z-50;
-    @apply bg-black/50 backdrop-blur-sm;
+    @apply bg-dark-950 backdrop-blur-sm;
     @apply flex items-center justify-center p-2 sm:p-4;
   }
 
@@ -417,6 +452,69 @@
   /* 防止body滚动的工具类 */
   body.modal-open {
     overflow: hidden;
+  }
+
+  .auth-drawer-overlay {
+    @apply fixed inset-0 z-[90] flex justify-end;
+    background:
+      radial-gradient(circle at 18% 18%, rgba(157, 221, 238, 0.08), transparent 28%),
+      rgba(2, 6, 12, 0.68);
+    backdrop-filter: blur(10px);
+  }
+
+  .auth-drawer-panel {
+    @apply relative h-full w-full overflow-hidden;
+    max-width: 480px;
+    background:
+      linear-gradient(180deg, rgba(17, 22, 31, 0.96), rgba(7, 10, 15, 0.98)),
+      linear-gradient(rgba(238, 246, 249, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(238, 246, 249, 0.035) 1px, transparent 1px);
+    background-size: auto, 42px 42px, 42px 42px;
+    border-left: 1px solid rgba(226, 238, 244, 0.16);
+    box-shadow: -32px 0 80px rgba(0, 0, 0, 0.42);
+    color: #e7f4f8;
+    will-change: transform, opacity;
+  }
+
+  .auth-drawer-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at top right, rgba(113, 203, 222, 0.12), transparent 36%),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 24%);
+  }
+
+  .auth-drawer-topline {
+    @apply absolute left-0 right-0 top-0 h-px;
+    background: linear-gradient(90deg, transparent, rgba(223, 239, 245, 0.72), transparent);
+  }
+
+  .auth-drawer-body {
+    @apply relative max-h-[calc(100svh-73px)] overflow-y-auto px-5 py-6 sm:px-7;
+  }
+
+  .auth-drawer-switch {
+    @apply mb-6 grid grid-cols-2 gap-1 p-1;
+    border: 1px solid rgba(222, 235, 240, 0.12);
+    background: rgba(5, 9, 14, 0.58);
+  }
+
+  .auth-drawer-switch-button {
+    @apply px-4 py-2.5 text-sm font-medium transition-all duration-200;
+    color: rgba(228, 240, 245, 0.58);
+  }
+
+  .auth-drawer-switch-button:hover {
+    color: rgba(241, 248, 250, 0.92);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .auth-drawer-switch-button.is-active {
+    color: #f3fbfd;
+    background: rgba(210, 229, 236, 0.11);
+    box-shadow: inset 0 0 0 1px rgba(231, 241, 245, 0.14);
   }
 
   .modal-enter-active {
@@ -492,7 +590,7 @@
 
   .dialog-footer {
     @apply border-t border-gray-100 px-6 py-4 dark:border-dark-700;
-    @apply bg-gray-50/60 dark:bg-dark-900/40;
+    @apply bg-gray-50 dark:bg-dark-900;
     @apply flex items-center justify-end gap-3;
   }
 
@@ -526,8 +624,8 @@
   /* ============ 侧边栏 ============ */
   .sidebar {
     @apply fixed inset-y-0 left-0 z-40;
-    @apply w-64 bg-white dark:bg-dark-900;
-    @apply border-r border-gray-200 dark:border-dark-800;
+    @apply w-64 bg-[#f7fbff]/80 dark:bg-dark-900/50;
+    @apply border-r border-primary-300/50 dark:border-primary-900/50;
     @apply flex flex-col;
     @apply transition-transform duration-300;
     transition-property: width, transform;
@@ -536,7 +634,7 @@
   .sidebar-header {
     @apply h-16 px-6;
     @apply flex items-center gap-3;
-    @apply border-b border-gray-100 dark:border-dark-800;
+    @apply border-b border-slate-200 dark:border-dark-800;
     transition:
       padding 0.2s ease,
       gap 0.2s ease;
@@ -552,16 +650,16 @@
     @apply text-sm font-medium;
     @apply text-gray-600 dark:text-dark-300;
     @apply transition-all duration-200;
-    @apply hover:bg-gray-100 dark:hover:bg-dark-800;
+    @apply hover:bg-primary-100 dark:hover:bg-primary-950;
     @apply hover:text-gray-900 dark:hover:text-white;
     padding-left: 1.0625rem;
     padding-right: 0.875rem;
   }
 
   .sidebar-link-active {
-    @apply bg-primary-50 dark:bg-primary-900/20;
-    @apply text-primary-600 dark:text-primary-400;
-    @apply hover:bg-primary-100 dark:hover:bg-primary-900/30;
+    @apply bg-primary-50 dark:bg-primary-950;
+    @apply text-primary-700 dark:text-primary-300;
+    @apply hover:bg-primary-100 dark:hover:bg-primary-950;
   }
 
   .sidebar-section {
@@ -580,7 +678,7 @@
   }
 
   .page-title {
-    @apply text-2xl font-bold text-gray-900 dark:text-white;
+    @apply text-3xl font-semibold text-accent-900 dark:text-[#def7ff];
   }
 
   .page-description {
@@ -623,8 +721,8 @@
 
   /* ============ 标签页 ============ */
   .tabs {
-    @apply flex gap-1 p-1;
-    @apply rounded-xl bg-gray-100 dark:bg-dark-800;
+    @apply flex gap-1.5 p-1.5;
+    @apply rounded-2xl bg-primary-50 dark:bg-dark-800;
   }
 
   .tab {
@@ -636,17 +734,17 @@
 
   .tab-active {
     @apply bg-white dark:bg-dark-700;
-    @apply text-gray-900 dark:text-white;
+    @apply text-accent-900 dark:text-white;
     @apply shadow-sm;
   }
 
   /* ============ 进度条 ============ */
   .progress {
-    @apply h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700;
+    @apply h-2.5 overflow-hidden rounded-full bg-primary-100 dark:bg-dark-700;
   }
 
   .progress-bar {
-    @apply h-full bg-gradient-to-r from-primary-500 to-primary-400;
+    @apply h-full bg-gradient-to-r from-primary-600 via-primary-500 to-primary-300;
     @apply transition-all duration-300;
   }
 
@@ -674,8 +772,8 @@
   /* ============ 代码块 ============ */
   .code {
     @apply font-mono text-sm;
-    @apply bg-gray-100 dark:bg-dark-800;
-    @apply rounded px-1.5 py-0.5;
+    @apply bg-primary-50 dark:bg-dark-800;
+    @apply rounded-lg px-2 py-1;
     @apply text-primary-600 dark:text-primary-400;
   }
 
@@ -737,13 +835,9 @@
 @layer utilities {
   /* 文字渐变 */
   .text-gradient {
-    @apply bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent;
+    @apply text-primary-600 dark:text-primary-300;
   }
 
-  /* 玻璃效果 */
-  .glass {
-    @apply bg-white/80 backdrop-blur-xl dark:bg-dark-800/80;
-  }
 
   /* 隐藏滚动条 */
   .scrollbar-hide {
@@ -762,4 +856,462 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+}
+
+:root {
+  --stone-bg: oklch(13% 0.012 240);
+  --stone-bg-deep: oklch(9.5% 0.01 240);
+  --stone-panel: rgba(17, 21, 27, 0.86);
+  --stone-panel-strong: rgba(11, 14, 19, 0.94);
+  --stone-panel-soft: rgba(230, 238, 242, 0.055);
+  --stone-line: rgba(232, 239, 242, 0.14);
+  --stone-line-soft: rgba(232, 239, 242, 0.075);
+  --stone-text: #edf6f8;
+  --stone-text-soft: rgba(224, 235, 240, 0.68);
+  --stone-muted: rgba(197, 211, 218, 0.52);
+  --stone-accent: #8fe8f5;
+  --stone-accent-strong: #d5f9ff;
+  --stone-danger: #ff8c8c;
+  --stone-success: #8ff0be;
+  --stone-warning: #f3ce82;
+
+  /* 几何与节奏 token —— Stone 语言用锐利小圆角，区别于旧后台的 rounded-[1.5rem] 软圆角 */
+  --stone-radius-sm: 4px;
+  --stone-radius: 8px;
+  --stone-radius-lg: 12px;
+  --stone-rail-w: 60px;
+  --stone-topbar-h: 56px;
+  --stone-glow: 0 0 0 1px rgba(143, 232, 245, 0.16), 0 0 22px -6px rgba(143, 232, 245, 0.35);
+  --stone-elev: 0 18px 48px -24px rgba(0, 0, 0, 0.85);
+}
+
+
+.tech-shell {
+  position: relative;
+  isolation: isolate;
+  color: var(--stone-text);
+  background-color: transparent;
+}
+
+.auth-tech-shell {
+  position: relative;
+  isolation: isolate;
+  color: var(--stone-text);
+  background:
+    linear-gradient(rgba(234, 242, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(234, 242, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(145deg, #11151b 0%, #080b10 54%, #030507 100%);
+  background-size: 52px 52px, 52px 52px, auto;
+}
+
+.tech-shell-grid,
+.auth-tech-grid {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(115deg, transparent 0 24%, rgba(232, 239, 242, 0.045) 24.1% 24.4%, transparent 24.5% 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%, transparent 82%, rgba(255, 255, 255, 0.035));
+  opacity: 0.86;
+}
+
+.auth-tech-grid {
+  position: absolute;
+}
+
+.tech-shell > .relative,
+.auth-tech-shell > .relative {
+  z-index: 1;
+}
+
+.tech-main {
+  position: relative;
+}
+
+.auth-tech-card {
+  border-radius: 8px;
+}
+
+.text-gradient {
+  color: var(--stone-accent-strong);
+}
+
+.auth-tech-shell .card-glass,
+.auth-drawer-panel .input,
+.auth-drawer-panel .btn,
+.auth-drawer-panel .card,
+.auth-drawer-panel .card-glass {
+  border-radius: 8px;
+}
+
+.auth-drawer-overlay {
+  background: rgba(1, 3, 7, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.auth-drawer-panel {
+  background:
+    linear-gradient(rgba(232, 239, 242, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 239, 242, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(15, 19, 26, 0.98), rgba(5, 8, 12, 0.99));
+  background-size: 42px 42px, 42px 42px, auto;
+  border-color: var(--stone-line);
+}
+
+.auth-drawer-panel::before {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 18%);
+}
+
+.auth-drawer-switch {
+  border-radius: 8px;
+  border-color: var(--stone-line);
+  background: rgba(4, 7, 11, 0.68);
+}
+
+.auth-drawer-switch-button {
+  border-radius: 6px;
+}
+
+.badge,
+.badge-primary,
+.badge-success,
+.badge-warning,
+.badge-danger,
+.badge-gray,
+.badge-purple {
+  border: 1px solid rgba(232, 239, 242, 0.12);
+}
+
+@media (max-width: 768px) {
+  .glass,
+  .glass-card,
+  .card,
+  .card-glass,
+  .dropdown,
+  .modal-content,
+  .dialog-container,
+  .toast,
+  .auth-drawer-overlay {
+    backdrop-filter: none;
+  }
+
+  .auth-drawer-panel {
+    max-width: 100%;
+    box-shadow: none;
+  }
+
+  .tech-shell-grid,
+  .auth-tech-grid {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .card,
+  .card-hover,
+  .sidebar-link,
+  .dropdown-item,
+  .input {
+    transition-duration: 1ms;
+  }
+}
+
+/* ============================================================
+   Stone 控制台外壳（原型）
+   细图标导航轨 + 顶部命令栏 + 锐利网格化面板。
+   仅在 appStore.stoneShell 开启时由 AppLayout 渲染，不影响旧布局。
+   ============================================================ */
+
+.stone-shell {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  color: var(--stone-text);
+}
+
+/* —— 左侧细导航轨 —— */
+.stone-rail {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  z-index: 40;
+  width: var(--stone-rail-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  background: linear-gradient(180deg, rgba(15, 19, 26, 0.92), rgba(7, 10, 15, 0.95));
+  border-right: 1px solid var(--stone-line);
+  backdrop-filter: blur(14px);
+}
+
+.stone-rail-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--stone-radius);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  margin-bottom: 6px;
+  box-shadow: var(--stone-glow);
+}
+
+.stone-rail-scroll {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.stone-rail-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* —— 导航轨上的单个图标按钮 —— */
+.stone-rail-link {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--stone-radius);
+  display: grid;
+  place-items: center;
+  color: var(--stone-muted);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.stone-rail-link:hover {
+  color: var(--stone-text);
+  background: var(--stone-panel-soft);
+}
+
+.stone-rail-link.is-active {
+  color: var(--stone-accent-strong);
+  background: rgba(143, 232, 245, 0.1);
+}
+
+/* 激活态左侧竖条指示 */
+.stone-rail-link.is-active::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--stone-accent);
+  box-shadow: 0 0 10px var(--stone-accent);
+}
+
+/* 悬停弹出的标签气泡 */
+.stone-rail-tip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  white-space: nowrap;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--stone-radius-sm);
+  background: var(--stone-panel-strong);
+  border: 1px solid var(--stone-line);
+  color: var(--stone-text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  z-index: 50;
+}
+
+.stone-rail-link:hover .stone-rail-tip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* —— 顶部命令栏 —— */
+.stone-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: var(--stone-topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 18px;
+  background: rgba(10, 13, 18, 0.66);
+  border-bottom: 1px solid var(--stone-line-soft);
+  backdrop-filter: blur(16px);
+}
+
+.stone-breadcrumb {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stone-breadcrumb-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--stone-text);
+  letter-spacing: 0.01em;
+}
+
+.stone-breadcrumb-sub {
+  font-size: 12px;
+  color: var(--stone-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 命令栏右侧的胶囊（余额、语言等） */
+.stone-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--stone-radius-sm);
+  border: 1px solid var(--stone-line-soft);
+  background: var(--stone-panel-soft);
+  color: var(--stone-text-soft);
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.stone-pill:hover {
+  border-color: var(--stone-line);
+  color: var(--stone-text);
+}
+
+/* —— 内容区 —— */
+.stone-content {
+  position: relative;
+  padding: 22px clamp(16px, 3vw, 34px) 40px;
+}
+
+/* —— Stone 面板：取代旧的 .card 软圆角 —— */
+.stone-panel {
+  position: relative;
+  border-radius: var(--stone-radius);
+  border: 1px solid var(--stone-line);
+  background: var(--stone-panel);
+  box-shadow: var(--stone-elev);
+}
+
+.stone-panel--grid {
+  background-image:
+    linear-gradient(rgba(232, 239, 242, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 239, 242, 0.028) 1px, transparent 1px),
+    linear-gradient(180deg, var(--stone-panel), rgba(9, 12, 17, 0.92));
+  background-size: 38px 38px, 38px 38px, auto;
+}
+
+@media (max-width: 768px) {
+  .stone-rail {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .stone-rail.is-open {
+    transform: translateX(0);
+  }
+  .stone-topbar,
+  .stone-panel {
+    backdrop-filter: none;
+  }
+}
+
+/* ============================================================
+   Stone 外壳浅色模式适配
+   外壳默认用深色 token；浅色模式（无 .dark）下，仅在 .stone-shell 作用域内
+   翻成浅色表面 + 深色文字，避免与白底内容打架。不影响登录页（auth 仍深色）。
+   ============================================================ */
+html:not(.dark) .stone-shell {
+  --stone-panel: rgba(255, 255, 255, 0.82);
+  --stone-panel-strong: rgba(255, 255, 255, 0.96);
+  --stone-panel-soft: rgba(15, 23, 42, 0.04);
+  --stone-line: rgba(15, 23, 42, 0.12);
+  --stone-line-soft: rgba(15, 23, 42, 0.07);
+  --stone-text: #1e293b;
+  --stone-text-soft: rgba(30, 41, 59, 0.72);
+  --stone-muted: rgba(71, 85, 105, 0.62);
+  --stone-accent: #0d9488;
+  --stone-accent-strong: #0f766e;
+  --stone-glow: 0 0 0 1px rgba(13, 148, 136, 0.18), 0 0 18px -8px rgba(13, 148, 136, 0.4);
+  --stone-elev: 0 16px 40px -28px rgba(15, 23, 42, 0.4);
+}
+
+/* 写死深色的两处背景，浅色模式显式覆盖 */
+html:not(.dark) .stone-shell .stone-rail {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(244, 248, 250, 0.96));
+  border-right-color: var(--stone-line);
+}
+
+html:not(.dark) .stone-shell .stone-topbar {
+  background: rgba(255, 255, 255, 0.74);
+}
+
+/* 浅色模式下激活态底色用更收敛的青色 */
+html:not(.dark) .stone-shell .stone-rail-link.is-active {
+  background: rgba(13, 148, 136, 0.1);
+}
+
+/* ============================================================
+   登录页（auth）重做：logo 芯片 + 高级玻璃卡片 + 背景统一
+   auth 恒为深色，直接用深色 stone token。
+   ============================================================ */
+.auth-logo-chip {
+  border-radius: var(--stone-radius-lg);
+  background: var(--stone-panel-strong);
+  border: 1px solid var(--stone-line);
+  box-shadow: var(--stone-glow), 0 12px 30px -12px rgba(0, 0, 0, 0.85);
+}
+
+.auth-card-glass {
+  position: relative;
+  border-radius: var(--stone-radius-lg);
+  border: 1px solid var(--stone-line);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(143, 232, 245, 0.08), transparent 44%),
+    linear-gradient(180deg, rgba(22, 27, 35, 0.8), rgba(10, 13, 18, 0.88));
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: var(--stone-elev), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+/* 顶部流光描边 */
+.auth-card-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg, rgba(143, 232, 245, 0.5), transparent 30%, transparent 70%, rgba(143, 232, 245, 0.22));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 背景统一：给登录页补一层和仪表盘一致的青色辉光 */
+.auth-tech-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(80% 60% at 50% 0%, rgba(143, 232, 245, 0.08), transparent 60%);
 }

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/gin-gonic/gin"
@@ -22,17 +23,17 @@ func init() {
 
 func TestInjectSiteTitle(t *testing.T) {
 	t.Run("replaces_title_with_site_name", func(t *testing.T) {
-		html := []byte(`<html><head><title>Sub2API - AI API Gateway</title></head><body></body></html>`)
+		html := []byte(`<html><head><title>石头中转站 - AI API Gateway</title></head><body></body></html>`)
 		settingsJSON := []byte(`{"site_name":"MyCustomSite"}`)
 
 		result := injectSiteTitle(html, settingsJSON)
 
 		assert.Contains(t, string(result), "<title>MyCustomSite - AI API Gateway</title>")
-		assert.NotContains(t, string(result), "Sub2API")
+		assert.NotContains(t, string(result), "石头中转站")
 	})
 
 	t.Run("returns_unchanged_when_site_name_empty", func(t *testing.T) {
-		html := []byte(`<html><head><title>Sub2API - AI API Gateway</title></head><body></body></html>`)
+		html := []byte(`<html><head><title>石头中转站 - AI API Gateway</title></head><body></body></html>`)
 		settingsJSON := []byte(`{"site_name":""}`)
 
 		result := injectSiteTitle(html, settingsJSON)
@@ -41,7 +42,7 @@ func TestInjectSiteTitle(t *testing.T) {
 	})
 
 	t.Run("returns_unchanged_when_site_name_missing", func(t *testing.T) {
-		html := []byte(`<html><head><title>Sub2API - AI API Gateway</title></head><body></body></html>`)
+		html := []byte(`<html><head><title>石头中转站 - AI API Gateway</title></head><body></body></html>`)
 		settingsJSON := []byte(`{"other_field":"value"}`)
 
 		result := injectSiteTitle(html, settingsJSON)
@@ -50,7 +51,7 @@ func TestInjectSiteTitle(t *testing.T) {
 	})
 
 	t.Run("returns_unchanged_when_invalid_json", func(t *testing.T) {
-		html := []byte(`<html><head><title>Sub2API - AI API Gateway</title></head><body></body></html>`)
+		html := []byte(`<html><head><title>石头中转站 - AI API Gateway</title></head><body></body></html>`)
 		settingsJSON := []byte(`{invalid json}`)
 
 		result := injectSiteTitle(html, settingsJSON)
@@ -760,5 +761,41 @@ func BenchmarkFrontendServerServeIndexHTML(b *testing.B) {
 		c.Set(middleware.CSPNonceKey, "test-nonce")
 
 		server.serveIndexHTML(c)
+	}
+}
+
+// TestFrontendServer_FileExists guards against the trailing-slash regression:
+// io/fs rejects "zero/" with "invalid argument", so without trimming the slash
+// fileExists would report an existing embedded sub-directory as missing and the
+// middleware would wrongly fall back to the SPA index.html (breaking /zero/).
+func TestFrontendServer_FileExists(t *testing.T) {
+	s := &FrontendServer{
+		distFS: fstest.MapFS{
+			"index.html":      {Data: []byte("<html>root</html>")},
+			"zero/index.html": {Data: []byte("<html>zero</html>")},
+			"assets/app.js":   {Data: []byte("console.log(1)")},
+		},
+	}
+
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"index.html", true},
+		{"zero/index.html", true},
+		{"zero", true},      // directory without trailing slash
+		{"zero/", true},     // directory WITH trailing slash (the regression case)
+		{"assets/", true},   // another directory with trailing slash
+		{"assets/app.js", true},
+		{"missing.html", false},
+		{"nope/", false}, // non-existent directory with trailing slash
+		{"/", false},     // bare slash trims to empty -> not a real file
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			assert.Equal(t, tt.want, s.fileExists(tt.path))
+		})
 	}
 }
