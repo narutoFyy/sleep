@@ -33,6 +33,7 @@ func RegisterUserRoutes(
 			user.POST("/auth-identities/bind/start", h.User.StartIdentityBinding)
 			user.GET("/api-keys/:id/usage/daily", h.Usage.GetMyAPIKeyDailyUsage)
 			user.GET("/platform-quotas", h.User.GetMyPlatformQuotas)
+			user.POST("/image-proxy", handler.ProxyImage)
 
 			// 通知邮箱管理
 			notifyEmail := user.Group("/notify-email")
@@ -70,6 +71,7 @@ func RegisterUserRoutes(
 		{
 			groups.GET("/available", h.APIKey.GetAvailableGroups)
 			groups.GET("/rates", h.APIKey.GetUserGroupRates)
+			groups.GET("/model-marketplace", h.AvailableChannel.Marketplace)
 		}
 
 		// 用户可用渠道（非管理员接口）

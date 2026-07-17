@@ -155,3 +155,46 @@ func TestBuildPlatformSections_GroupsByPlatform(t *testing.T) {
 	require.Len(t, sections[0].SupportedModels, 1)
 	require.Equal(t, "claude-sonnet-4-6", sections[0].SupportedModels[0].Name)
 }
+
+func TestNormalizeMarketplaceModels_FiltersRetiredGPTModels(t *testing.T) {
+	models := []string{
+		"gpt-4o-audio-preview",
+		"gpt-5.2",
+		"gpt-5.2-pro",
+		"GPT-5.3-CODEX",
+		"gpt-5.3-codex-spark",
+		"gpt-5.4",
+		"gpt-5.6-sol",
+		"gpt-image-2",
+		"claude-opus-4-8",
+		" gpt-5.4 ",
+	}
+
+	require.Equal(t, []string{
+		"claude-opus-4-8",
+		"gpt-5.4",
+		"gpt-5.6-sol",
+		"gpt-image-2",
+	}, normalizeMarketplaceModels(models))
+}
+
+func TestMarketplacePricingForGroup_UsesFlatImagePrice(t *testing.T) {
+	basePrice := 1.0
+	group := &service.Group{
+		AllowImageGeneration: true,
+		ImageRateIndependent: false,
+		ImagePrice1K:         &basePrice,
+	}
+	catalogPricing := &service.LiteLLMModelPricing{
+		Mode:                    "image_generation",
+		OutputCostPerImageToken: 0.00004,
+	}
+
+	pricing := marketplacePricingForGroup(group, "gpt-image-1", catalogPricing)
+
+	require.NotNil(t, pricing)
+	require.Equal(t, string(service.BillingModeImage), pricing.BillingMode)
+	require.NotNil(t, pricing.PerRequestPrice)
+	require.Equal(t, 1.0, *pricing.PerRequestPrice)
+	require.Nil(t, pricing.ImageOutputPrice)
+}

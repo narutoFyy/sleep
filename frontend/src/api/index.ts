@@ -20,6 +20,16 @@ export { userChannelsAPI } from './channels'
 export { totpAPI } from './totp'
 export { default as announcementsAPI } from './announcements'
 export { channelMonitorUserAPI } from './channelMonitor'
+export {
+  imageAPI,
+  type ImageGenerationRequest,
+  type ImageEditRequest,
+  type ImageResultItem,
+  type ImageGenerationResponse,
+  type ImageRequestDebugInfo,
+  ImageRequestError,
+  proxyImage
+} from './image'
 
 // Admin APIs
 export { adminAPI } from './admin'

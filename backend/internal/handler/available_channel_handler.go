@@ -2,6 +2,7 @@ package handler
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -24,6 +25,8 @@ type AvailableChannelHandler struct {
 	channelService *service.ChannelService
 	apiKeyService  *service.APIKeyService
 	settingService *service.SettingService
+	gatewayService *service.GatewayService
+	pricingService *service.PricingService
 }
 
 // NewAvailableChannelHandler 创建用户侧可用渠道 handler。
@@ -31,12 +34,195 @@ func NewAvailableChannelHandler(
 	channelService *service.ChannelService,
 	apiKeyService *service.APIKeyService,
 	settingService *service.SettingService,
+	gatewayService *service.GatewayService,
+	pricingService *service.PricingService,
 ) *AvailableChannelHandler {
 	return &AvailableChannelHandler{
 		channelService: channelService,
 		apiKeyService:  apiKeyService,
 		settingService: settingService,
+		gatewayService: gatewayService,
+		pricingService: pricingService,
 	}
+}
+
+type marketplacePricing struct {
+	BillingMode      string   `json:"billing_mode"`
+	InputPrice       *float64 `json:"input_price"`
+	OutputPrice      *float64 `json:"output_price"`
+	CacheWritePrice  *float64 `json:"cache_write_price"`
+	CacheReadPrice   *float64 `json:"cache_read_price"`
+	ImageOutputPrice *float64 `json:"image_output_price"`
+	PerRequestPrice  *float64 `json:"per_request_price"`
+}
+
+type marketplaceModel struct {
+	Name     string              `json:"name"`
+	Platform string              `json:"platform"`
+	Pricing  *marketplacePricing `json:"pricing"`
+}
+
+type marketplaceGroup struct {
+	ID             int64              `json:"id"`
+	Name           string             `json:"name"`
+	Platform       string             `json:"platform"`
+	RateMultiplier float64            `json:"rate_multiplier"`
+	IsExclusive    bool               `json:"is_exclusive"`
+	Models         []marketplaceModel `json:"models"`
+}
+
+// Marketplace returns models that the current user can actually bind through
+// their visible groups. It reuses gateway account capability discovery and
+// the shared pricing catalog, without exposing accounts or routing metadata.
+func (h *AvailableChannelHandler) Marketplace(c *gin.Context) {
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	groups, err := h.apiKeyService.GetAvailableGroups(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	rates, err := h.apiKeyService.GetUserGroupRates(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	out := make([]marketplaceGroup, 0, len(groups))
+	for i := range groups {
+		group := &groups[i]
+		groupID := group.ID
+		models := h.gatewayService.GetAvailableModels(c.Request.Context(), &groupID, group.Platform)
+		if len(models) == 0 && len(group.ModelsListConfig.Models) > 0 {
+			models = append([]string(nil), group.ModelsListConfig.Models...)
+		}
+		models = normalizeMarketplaceModels(models)
+		if len(models) == 0 {
+			continue
+		}
+
+		rate := group.RateMultiplier
+		if userRate, exists := rates[group.ID]; exists {
+			rate = userRate
+		}
+		item := marketplaceGroup{
+			ID:             group.ID,
+			Name:           group.Name,
+			Platform:       group.Platform,
+			RateMultiplier: rate,
+			IsExclusive:    group.IsExclusive,
+			Models:         make([]marketplaceModel, 0, len(models)),
+		}
+		for _, modelName := range models {
+			item.Models = append(item.Models, marketplaceModel{
+				Name:     modelName,
+				Platform: group.Platform,
+				Pricing:  marketplacePricingForGroup(group, modelName, h.pricingService.GetModelPricing(modelName)),
+			})
+		}
+		out = append(out, item)
+	}
+
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].RateMultiplier == out[j].RateMultiplier {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].RateMultiplier < out[j].RateMultiplier
+	})
+	response.Success(c, out)
+}
+
+func normalizeMarketplaceModels(models []string) []string {
+	seen := make(map[string]struct{}, len(models))
+	out := make([]string, 0, len(models))
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		key := strings.ToLower(model)
+		if model == "" {
+			continue
+		}
+		if isRetiredMarketplaceModel(key) {
+			continue
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, model)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func isRetiredMarketplaceModel(model string) bool {
+	return strings.HasPrefix(model, "gpt-3") ||
+		strings.HasPrefix(model, "gpt-4") ||
+		model == "gpt-5.0" ||
+		strings.HasPrefix(model, "gpt-5.0-") ||
+		model == "gpt-5.1" ||
+		strings.HasPrefix(model, "gpt-5.1-") ||
+		model == "gpt-5.2" ||
+		strings.HasPrefix(model, "gpt-5.2-") ||
+		model == "gpt-5.3" ||
+		strings.HasPrefix(model, "gpt-5.3-")
+}
+
+func marketplacePricingFromCatalog(p *service.LiteLLMModelPricing) *marketplacePricing {
+	if p == nil {
+		return nil
+	}
+	mode := service.BillingModeToken
+	if p.Mode == "image_generation" {
+		mode = service.BillingModeImage
+	}
+	return &marketplacePricing{
+		BillingMode:      string(mode),
+		InputPrice:       nonZeroMarketplacePrice(p.InputCostPerToken),
+		OutputPrice:      nonZeroMarketplacePrice(p.OutputCostPerToken),
+		CacheWritePrice:  nonZeroMarketplacePrice(p.CacheCreationInputTokenCost),
+		CacheReadPrice:   nonZeroMarketplacePrice(p.CacheReadInputTokenCost),
+		ImageOutputPrice: nonZeroMarketplacePrice(p.OutputCostPerImageToken),
+		PerRequestPrice:  nonZeroMarketplacePrice(p.OutputCostPerImage),
+	}
+}
+
+func marketplacePricingForGroup(
+	group *service.Group,
+	modelName string,
+	catalogPricing *service.LiteLLMModelPricing,
+) *marketplacePricing {
+	pricing := marketplacePricingFromCatalog(catalogPricing)
+	if group == nil ||
+		!group.AllowImageGeneration ||
+		group.ImageRateIndependent ||
+		group.ImagePrice1K == nil ||
+		*group.ImagePrice1K <= 0 {
+		return pricing
+	}
+
+	modelKey := strings.ToLower(strings.TrimSpace(modelName))
+	isImageModel := strings.HasPrefix(modelKey, "gpt-image-") ||
+		(pricing != nil && pricing.BillingMode == string(service.BillingModeImage))
+	if !isImageModel {
+		return pricing
+	}
+
+	basePrice := *group.ImagePrice1K
+	return &marketplacePricing{
+		BillingMode:     string(service.BillingModeImage),
+		PerRequestPrice: &basePrice,
+	}
+}
+
+func nonZeroMarketplacePrice(value float64) *float64 {
+	if value == 0 {
+		return nil
+	}
+	return &value
 }
 
 // featureEnabled 返回 available-channels 开关是否启用。默认关闭（opt-in）。

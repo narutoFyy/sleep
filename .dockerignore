@@ -78,3 +78,7 @@ deploy/redis_data/
 .claude/
 issues/
 CLAUDE.md
+
+# Codex local backups
+.codex-backups/
+frontend/dist/

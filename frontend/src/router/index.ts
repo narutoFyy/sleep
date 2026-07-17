@@ -206,6 +206,29 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/image-generator',
+    name: 'ImageStudio',
+    component: () => import('@/views/user/ImageStudioView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Image Studio',
+      titleKey: 'nav.imageStudio'
+    }
+  },
+  {
+    path: '/model-marketplace',
+    name: 'ModelMarketplace',
+    component: () => import('@/views/user/ModelMarketplaceView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Model Marketplace',
+      titleKey: 'modelMarketplace.title',
+      descriptionKey: 'modelMarketplace.description'
+    }
+  },
+  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),

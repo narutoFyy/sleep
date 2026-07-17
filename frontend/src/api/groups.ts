@@ -27,9 +27,40 @@ export async function getUserGroupRates(): Promise<Record<number, number>> {
   return data || {}
 }
 
+export interface MarketplacePricing {
+  billing_mode: 'token' | 'per_request' | 'image'
+  input_price: number | null
+  output_price: number | null
+  cache_write_price: number | null
+  cache_read_price: number | null
+  image_output_price: number | null
+  per_request_price: number | null
+}
+
+export interface MarketplaceModel {
+  name: string
+  platform: string
+  pricing: MarketplacePricing | null
+}
+
+export interface MarketplaceGroup {
+  id: number
+  name: string
+  platform: string
+  rate_multiplier: number
+  is_exclusive: boolean
+  models: MarketplaceModel[]
+}
+
+export async function getModelMarketplace(): Promise<MarketplaceGroup[]> {
+  const { data } = await apiClient.get<MarketplaceGroup[]>('/groups/model-marketplace')
+  return data
+}
+
 export const userGroupsAPI = {
   getAvailable,
-  getUserGroupRates
+  getUserGroupRates,
+  getModelMarketplace
 }
 
 export default userGroupsAPI
