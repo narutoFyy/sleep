@@ -111,16 +111,16 @@
 
 ## 部署状态
 
-- 测试环境：端口 8084，镜像 `sub2api-shitou:shitoutk-precontent-fix-20260718`，健康检查通过。
-- 生产环境：端口 8090，未部署本次修改，容器、镜像和启动时间均未变化。
+- 生产环境：端口 8090 已部署镜像 `sub2api-shitou:shitoutk-precontent-fix-20260718`，连续健康检查通过，启动和迁移错误为 0。
+- 测试环境：完成生产切换后已删除 8084 应用容器，端口 8084 不再监听。
 - 8086/8087：原 tg-message 相关部署已删除，端口未监听。
 
-生产环境保留指纹：
+生产环境当前指纹：
 
 ```text
-Container: 49b39f96db32e69aca3a21bd3a68cdc69e03f575b4f15ba1e0139d46757a4a3e
-Image: sub2api-shitou:shitoutk-prod-20260712-005914
-Started: 2026-07-11T17:16:40.931017036Z
+Container: a0db0f5a7c41b86139c565e223b04805844bff5d2c0b2cdb611285152377901b
+Image: sub2api-shitou:shitoutk-precontent-fix-20260718
+Started: 2026-07-18T14:36:19.598161249Z
 ```
 
 ## 备份

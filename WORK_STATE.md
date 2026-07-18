@@ -6,7 +6,7 @@
 
 ## Current task
 
-All planned tasks are complete. The latest candidate is healthy on port 8084; production port 8090 was not changed.
+All planned tasks are complete. The verified standby build is healthy on production port 8090, and the temporary 8084 deployment has been removed.
 
 ## Rules
 
@@ -55,7 +55,7 @@ None. All planned tasks passed main verification.
 ### T-010
 
 - Purpose: make OpenAI Chat Completions streams fail over when an HTTP 200 upstream disconnects after only keepalive or metadata frames.
-- Completion evidence: focused stream regressions, full service/handler suites and backend `go test ./...` passed; controlled 8084 tests used `cs/primary` while healthy, switched heartbeat-only and metadata-only EOF requests to `kun/standby` with two audited attempts and no client error, and kept content-then-EOF on the original account with an explicit stream error instead of splicing responses. Image `sub2api-shitou:shitoutk-precontent-fix-20260718` is deployed on 8084; 8090 retained its original fingerprint.
+- Completion evidence: focused stream regressions, full service/handler suites and backend `go test ./...` passed; controlled 8084 tests used `cs/primary` while healthy, switched heartbeat-only and metadata-only EOF requests to `kun/standby` with two audited attempts and no client error, and kept content-then-EOF on the original account with an explicit stream error instead of splicing responses. Image `sub2api-shitou:shitoutk-precontent-fix-20260718` is deployed and healthy on 8090; the temporary 8084 application container was removed after production verification.
 
 ## File Access Requests
 
@@ -112,4 +112,5 @@ None. All planned tasks passed main verification.
 - 2026-07-18: Controlled 8084 testing confirmed connection-refusal failover succeeds, but heartbeat-only EOF returned 502 before standby; activated T-010. Content-then-EOF correctly avoided response splicing and emitted a stream error.
 - 2026-07-18: Buffered OpenAI Chat Completions metadata/keepalives until effective output and converted pre-content missing-terminal/read errors into failover errors for Responses and raw compatibility paths.
 - 2026-07-18: T-010 passed focused tests, full service/handler tests, backend `go test ./...`, image build, and five controlled 8084 routing scenarios; `T-010 implementing -> self_check -> main_verify -> done`; work status set to `complete`.
+- 2026-07-18: With explicit production approval, replaced 8090 with the verified T-010 image, confirmed consecutive health checks and zero startup/migration errors, then removed the 8084 test application and rollback containers. Ports 8084/8086/8087 are closed.
 - 2026-07-18: Assigned `T-004` to child agent; `assigned -> implementing`.
