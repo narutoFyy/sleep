@@ -38,6 +38,7 @@ All planned tasks are complete. The latest candidate is healthy on port 8084; pr
 | T-007 | Full verification and port-8084 deployment | done | T-005, T-006 | tests/configuration and a separate 8084 deployment | Full test sweep, health checks, port/process inspection |
 | T-008 | OpenAI live failover repair and retest | done | T-007 | OpenAI Chat Completions transport handling, standby entry predicate, focused tests and isolated 8084 deployment | Unit tests plus real `cs` to `kun` transport-failure exercise |
 | T-009 | Standby membership preservation and UI clarity | done | T-008 | legacy group binding compatibility, account edit payload, standby modal/account-list presentation and focused tests | Persistence regression, frontend tests/build and fresh 8084 route checks |
+| T-010 | OpenAI pre-content stream disconnect failover | done | T-009 | OpenAI Chat Completions stream handling and focused tests | Unit regressions plus controlled 8084 heartbeat/content disconnect exercises |
 
 ## Active Task
 
@@ -50,6 +51,11 @@ None. All planned tasks passed main verification.
 - Purpose: prevent an ordinary account edit from converting an existing standby membership to primary, and clearly distinguish already-configured standby accounts from addable accounts.
 - Exact work: preserve role, enabled state, priority and model mapping when legacy `group_ids` updates retain a membership; submit structured memberships from the account editor; show configured standby accounts first; mark standby group badges in the account list; re-verify normal and failure routing on 8084.
 - Completion evidence: the tagged PostgreSQL integration regression passed; frontend typecheck, 8 focused Vitest cases and production build passed; full backend `go test ./...` passed; a deployed legacy `group_ids:[3]` update retained `kun` as enabled standby with its mapping; a healthy request used `cs/primary`, while the same request with the sole primary temporarily unschedulable used `kun/standby`; 8084 image `sub2api-shitou:shitoutk-standby-role-fix-20260718` is healthy and 8090 retained its original fingerprint.
+
+### T-010
+
+- Purpose: make OpenAI Chat Completions streams fail over when an HTTP 200 upstream disconnects after only keepalive or metadata frames.
+- Completion evidence: focused stream regressions, full service/handler suites and backend `go test ./...` passed; controlled 8084 tests used `cs/primary` while healthy, switched heartbeat-only and metadata-only EOF requests to `kun/standby` with two audited attempts and no client error, and kept content-then-EOF on the original account with an explicit stream error instead of splicing responses. Image `sub2api-shitou:shitoutk-precontent-fix-20260718` is deployed on 8084; 8090 retained its original fingerprint.
 
 ## File Access Requests
 
@@ -103,4 +109,7 @@ None. All planned tasks passed main verification.
 - 2026-07-18: Added frontend and repository safeguards so ordinary account edits and legacy `group_ids` calls preserve standby role, enabled state, priority and model mapping; reordered the standby editor and marked standby group badges.
 - 2026-07-18: Passed tagged repository integration, focused service, frontend typecheck/Vitest/build and full backend tests; deployed image `sub2api-shitou:shitoutk-standby-role-fix-20260718` to 8084.
 - 2026-07-18: Live 8084 verification recorded `cs/primary` while healthy, `kun/standby` only after the sole primary became unschedulable, and retained `kun/standby` after an actual legacy account update; `T-009 implementing -> self_check -> main_verify -> done`; work status set to `complete`.
+- 2026-07-18: Controlled 8084 testing confirmed connection-refusal failover succeeds, but heartbeat-only EOF returned 502 before standby; activated T-010. Content-then-EOF correctly avoided response splicing and emitted a stream error.
+- 2026-07-18: Buffered OpenAI Chat Completions metadata/keepalives until effective output and converted pre-content missing-terminal/read errors into failover errors for Responses and raw compatibility paths.
+- 2026-07-18: T-010 passed focused tests, full service/handler tests, backend `go test ./...`, image build, and five controlled 8084 routing scenarios; `T-010 implementing -> self_check -> main_verify -> done`; work status set to `complete`.
 - 2026-07-18: Assigned `T-004` to child agent; `assigned -> implementing`.

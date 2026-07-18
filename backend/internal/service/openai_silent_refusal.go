@@ -41,7 +41,7 @@ func (d *openAIChatSilentRefusalDetector) Enabled() bool {
 }
 
 func (d *openAIChatSilentRefusalDetector) ObserveSSELine(line string) {
-	if d == nil || !d.enabled {
+	if d == nil {
 		return
 	}
 	if eventType, ok := extractOpenAISSEEventLine(line); ok {
@@ -54,7 +54,7 @@ func (d *openAIChatSilentRefusalDetector) ObserveSSELine(line string) {
 }
 
 func (d *openAIChatSilentRefusalDetector) ObservePayload(payload []byte) {
-	if d == nil || !d.enabled {
+	if d == nil {
 		return
 	}
 	payload = bytes.TrimSpace(payload)
@@ -83,7 +83,7 @@ func (d *openAIChatSilentRefusalDetector) ObservePayload(payload []byte) {
 }
 
 func (d *openAIChatSilentRefusalDetector) ObserveChatChunk(chunk apicompat.ChatCompletionsChunk) {
-	if d == nil || !d.enabled {
+	if d == nil {
 		return
 	}
 	if chunk.Usage != nil {
@@ -109,6 +109,16 @@ func (d *openAIChatSilentRefusalDetector) ObserveChatChunk(chunk apicompat.ChatC
 func (d *openAIChatSilentRefusalDetector) ShouldReleaseClientOutput() bool {
 	if d == nil || !d.enabled {
 		return true
+	}
+	return d.HasEffectiveOutput()
+}
+
+// HasEffectiveOutput reports whether the stream contains model output rather
+// than role metadata or keepalive framing. It intentionally ignores whether
+// large-request silent-refusal detection is enabled.
+func (d *openAIChatSilentRefusalDetector) HasEffectiveOutput() bool {
+	if d == nil {
+		return false
 	}
 	if d.sawContent || d.sawToolCall || d.sawFunctionCall || d.sawUsage || d.sawError || d.sawReasoning {
 		return true
