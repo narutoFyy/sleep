@@ -9,8 +9,8 @@
       {{ t('common.loading') }}
     </div>
 
-    <div v-else-if="group && isStandbyProvider(group.platform)" class="space-y-6">
-      <section class="border-b border-gray-200 pb-6 dark:border-dark-600">
+    <div v-else-if="group && isStandbyProvider(group.platform)" class="flex flex-col gap-6">
+      <section class="order-2 border-t border-gray-200 pt-6 dark:border-dark-600">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
             {{ t('admin.groups.standby.addAccounts') }}
@@ -66,7 +66,7 @@
         </div>
       </section>
 
-      <section>
+      <section class="order-1">
         <h4 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
           {{ t('admin.groups.standby.configuredAccounts') }}
         </h4>

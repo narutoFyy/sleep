@@ -6,7 +6,7 @@
 
 ## Current task
 
-All planned tasks are complete. The repaired candidate remains available on port 8084; production port 8090 was not changed.
+All planned tasks are complete. The latest candidate is healthy on port 8084; production port 8090 was not changed.
 
 ## Rules
 
@@ -37,6 +37,7 @@ All planned tasks are complete. The repaired candidate remains available on port
 | T-006 | Admin standby configuration UI | done | T-001, T-004 | group/account admin API and `GroupsView.vue` related frontend modules | Typecheck, frontend tests and browser workflow |
 | T-007 | Full verification and port-8084 deployment | done | T-005, T-006 | tests/configuration and a separate 8084 deployment | Full test sweep, health checks, port/process inspection |
 | T-008 | OpenAI live failover repair and retest | done | T-007 | OpenAI Chat Completions transport handling, standby entry predicate, focused tests and isolated 8084 deployment | Unit tests plus real `cs` to `kun` transport-failure exercise |
+| T-009 | Standby membership preservation and UI clarity | done | T-008 | legacy group binding compatibility, account edit payload, standby modal/account-list presentation and focused tests | Persistence regression, frontend tests/build and fresh 8084 route checks |
 
 ## Active Task
 
@@ -44,12 +45,11 @@ None. All planned tasks passed main verification.
 
 ## Latest Completion Evidence
 
-### T-008
+### T-009
 
-- Purpose: fix two gaps found by real-key verification: TCP/DNS/TLS failures committed a 502 before account switching, and a new request did not enter standby when all primary accounts were globally unavailable.
-- Exact work: route both Chat Completions upstream transport paths through the existing OpenAI transport-failover helper; permit standby selection for `ErrNoAvailableAccounts`; add focused regressions; enable pool mode with zero same-account retries for the two 8084 relay accounts; rebuild and re-run real transport failure against `cs` with `kun` as standby.
-- Non-goals: no 8090 deployment or production data change.
-- Completion evidence: both `cs` and `kun` have `pool_mode=true` and `pool_mode_retry_count=0`; real TCP refusal on `cs` failed over to `kun` without committing the intermediate 502; a subsequent request while `cs` was unavailable entered standby directly; after restoring `cs`, its real upstream 502 also failed over to `kun`; full `go test ./...` passed on the server with Go 1.26.4.
+- Purpose: prevent an ordinary account edit from converting an existing standby membership to primary, and clearly distinguish already-configured standby accounts from addable accounts.
+- Exact work: preserve role, enabled state, priority and model mapping when legacy `group_ids` updates retain a membership; submit structured memberships from the account editor; show configured standby accounts first; mark standby group badges in the account list; re-verify normal and failure routing on 8084.
+- Completion evidence: the tagged PostgreSQL integration regression passed; frontend typecheck, 8 focused Vitest cases and production build passed; full backend `go test ./...` passed; a deployed legacy `group_ids:[3]` update retained `kun` as enabled standby with its mapping; a healthy request used `cs/primary`, while the same request with the sole primary temporarily unschedulable used `kun/standby`; 8084 image `sub2api-shitou:shitoutk-standby-role-fix-20260718` is healthy and 8090 retained its original fingerprint.
 
 ## File Access Requests
 
@@ -99,4 +99,8 @@ None. All planned tasks passed main verification.
 - 2026-07-18: Enabled pool mode with zero same-account retries for 8084 accounts `cs` and `kun`; account URLs and keys were left unchanged.
 - 2026-07-18: Verified real-key standby routing for injected connection refusal, already-unavailable primary entry, and a real restored-primary upstream 502; all client requests completed through `kun` with standby audit records.
 - 2026-07-18: Full backend `go test ./...` passed; `T-008 implementing -> self_check -> main_verify -> done`; work status set to `complete`.
+- 2026-07-18: Investigated the reported standby disappearance: database and gateway logs confirmed `kun` remained standby; direct account connectivity tests, not normal gateway routing, produced the misleading primary usage rows.
+- 2026-07-18: Added frontend and repository safeguards so ordinary account edits and legacy `group_ids` calls preserve standby role, enabled state, priority and model mapping; reordered the standby editor and marked standby group badges.
+- 2026-07-18: Passed tagged repository integration, focused service, frontend typecheck/Vitest/build and full backend tests; deployed image `sub2api-shitou:shitoutk-standby-role-fix-20260718` to 8084.
+- 2026-07-18: Live 8084 verification recorded `cs/primary` while healthy, `kun/standby` only after the sole primary became unschedulable, and retained `kun/standby` after an actual legacy account update; `T-009 implementing -> self_check -> main_verify -> done`; work status set to `complete`.
 - 2026-07-18: Assigned `T-004` to child agent; `assigned -> implementing`.

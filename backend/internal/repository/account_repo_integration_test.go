@@ -558,6 +558,35 @@ func (s *AccountRepoSuite) TestBindGroups_EmptyList() {
 	s.Require().Empty(groups, "expected 0 groups after binding empty list")
 }
 
+func (s *AccountRepoSuite) TestBindGroups_PreservesExistingStandbyMembership() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "standby-preserved"})
+	standbyGroup := mustCreateGroup(s.T(), s.client, &service.Group{Name: "standby-group"})
+	primaryGroup := mustCreateGroup(s.T(), s.client, &service.Group{Name: "new-primary-group"})
+	mapping := map[string]string{"gpt-*": "gpt-5.5"}
+
+	s.Require().NoError(s.repo.BindAccountGroups(s.ctx, account.ID, []service.AccountGroup{{
+		GroupID:      standbyGroup.ID,
+		Priority:     7,
+		Role:         service.AccountGroupRoleStandby,
+		Enabled:      true,
+		ModelMapping: mapping,
+	}}))
+
+	s.Require().NoError(s.repo.BindGroups(s.ctx, account.ID, []int64{standbyGroup.ID, primaryGroup.ID}))
+
+	got, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Len(got.AccountGroups, 2)
+	memberships := make(map[int64]service.AccountGroup, len(got.AccountGroups))
+	for _, membership := range got.AccountGroups {
+		memberships[membership.GroupID] = membership
+	}
+	s.Require().Equal(service.AccountGroupRoleStandby, memberships[standbyGroup.ID].Role)
+	s.Require().Equal(7, memberships[standbyGroup.ID].Priority)
+	s.Require().Equal(mapping, memberships[standbyGroup.ID].ModelMapping)
+	s.Require().Equal(service.AccountGroupRolePrimary, memberships[primaryGroup.ID].Role)
+}
+
 func (s *AccountRepoSuite) TestBindAccountGroups_RoundTripsMembershipFields() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-membership"})
 	group := mustCreateGroup(s.T(), s.client, &service.Group{Name: "g-membership"})

@@ -868,7 +868,32 @@ func (r *accountRepository) GetGroups(ctx context.Context, accountID int64) ([]s
 }
 
 func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error {
-	return r.BindAccountGroups(ctx, accountID, service.LegacyAccountGroupMemberships(groupIDs))
+	existing, err := r.client.AccountGroup.Query().
+		Where(dbaccountgroup.AccountIDEQ(accountID)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+
+	existingByGroupID := make(map[int64]*dbent.AccountGroup, len(existing))
+	for _, membership := range existing {
+		existingByGroupID[membership.GroupID] = membership
+	}
+
+	memberships := service.LegacyAccountGroupMemberships(groupIDs)
+	for i := range memberships {
+		current, ok := existingByGroupID[memberships[i].GroupID]
+		if !ok {
+			continue
+		}
+		memberships[i].Priority = current.Priority
+		memberships[i].Role = service.AccountGroupRole(current.Role)
+		memberships[i].Enabled = current.Enabled
+		memberships[i].ModelMapping = current.ModelMapping
+		memberships[i].CreatedAt = current.CreatedAt
+	}
+
+	return r.BindAccountGroups(ctx, accountID, memberships)
 }
 
 func (r *accountRepository) BindAccountGroups(ctx context.Context, accountID int64, memberships []service.AccountGroup) error {

@@ -55,6 +55,27 @@ export function hasPrimaryMembership(
   )
 }
 
+export function mergeSelectedGroupMemberships(
+  account: Pick<AccountWithGroupMemberships, 'account_groups' | 'group_ids'>,
+  selectedGroupIds: number[]
+): AccountGroupMembership[] {
+  const existingByGroupId = new Map(
+    normalizeMemberships(account).map((membership) => [membership.group_id, membership])
+  )
+
+  return selectedGroupIds.map((groupId, index) => {
+    const existing = existingByGroupId.get(groupId)
+    if (existing) return { ...existing, model_mapping: { ...(existing.model_mapping ?? {}) } }
+    return {
+      group_id: groupId,
+      role: 'primary',
+      enabled: true,
+      priority: index + 1,
+      model_mapping: {}
+    }
+  })
+}
+
 export function mergeStandbyMembership(
   account: Pick<AccountWithGroupMemberships, 'account_groups' | 'group_ids'>,
   groupId: number,

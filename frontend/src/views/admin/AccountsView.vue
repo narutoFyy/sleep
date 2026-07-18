@@ -271,7 +271,7 @@
             />
           </template>
           <template #cell-groups="{ row }">
-            <AccountGroupsCell :groups="row.groups" :max-display="4" />
+            <AccountGroupsCell :groups="row.groups" :memberships="row.account_groups" :max-display="4" />
           </template>
           <template #header-usage="{ column }">
             <div class="flex items-center">

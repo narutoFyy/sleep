@@ -4,6 +4,7 @@ import {
   STANDBY_ACCOUNT_DEFAULTS,
   hasPrimaryMembership,
   isProviderCompatible,
+  mergeSelectedGroupMemberships,
   mergeStandbyMembership,
   removeMembershipFromGroup,
   validateMappingRows
@@ -78,6 +79,20 @@ describe('group standby memberships', () => {
     })
     expect(removeMembershipFromGroup(source, 4)).toEqual([
       { group_id: 5, role: 'standby', enabled: true }
+    ])
+  })
+
+  it('preserves standby metadata when the legacy group selector saves an account', () => {
+    const source = account({
+      account_groups: [
+        { group_id: 3, role: 'standby', enabled: true, priority: 7, model_mapping: { 'gpt-*': 'gpt-5.5' } }
+      ],
+      group_ids: [3]
+    })
+
+    expect(mergeSelectedGroupMemberships(source, [3, 4])).toEqual([
+      { group_id: 3, role: 'standby', enabled: true, priority: 7, model_mapping: { 'gpt-*': 'gpt-5.5' } },
+      { group_id: 4, role: 'primary', enabled: true, priority: 2, model_mapping: {} }
     ])
   })
 })

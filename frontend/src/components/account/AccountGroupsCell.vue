@@ -2,16 +2,20 @@
   <div v-if="groups && groups.length > 0" class="relative max-w-56">
     <!-- 分组容器：固定最大宽度，最多显示2行 -->
     <div class="flex flex-wrap gap-1 max-h-14 overflow-hidden">
-      <GroupBadge
-        v-for="group in displayGroups"
-        :key="group.id"
-        :name="group.name"
-        :platform="group.platform"
-        :subscription-type="group.subscription_type"
-        :rate-multiplier="group.rate_multiplier"
-        :show-rate="false"
-        class="max-w-24"
-      />
+      <span v-for="group in displayGroups" :key="group.id" class="inline-flex min-w-0 items-center gap-1">
+        <GroupBadge
+          :name="group.name"
+          :platform="group.platform"
+          :subscription-type="group.subscription_type"
+          :rate-multiplier="group.rate_multiplier"
+          :show-rate="false"
+          class="max-w-24"
+        />
+        <span
+          v-if="isStandbyGroup(group.id)"
+          class="rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+        >{{ t('admin.groups.standby.role') }}</span>
+      </span>
       <!-- 更多数量徽章 -->
       <button
         v-if="hiddenCount > 0"
@@ -53,15 +57,19 @@
             </button>
           </div>
           <div class="flex flex-wrap gap-1.5 max-h-64 overflow-y-auto">
-            <GroupBadge
-              v-for="group in groups"
-              :key="group.id"
-              :name="group.name"
-              :platform="group.platform"
-              :subscription-type="group.subscription_type"
-              :rate-multiplier="group.rate_multiplier"
-              :show-rate="false"
-            />
+            <span v-for="group in groups" :key="group.id" class="inline-flex items-center gap-1">
+              <GroupBadge
+                :name="group.name"
+                :platform="group.platform"
+                :subscription-type="group.subscription_type"
+                :rate-multiplier="group.rate_multiplier"
+                :show-rate="false"
+              />
+              <span
+                v-if="isStandbyGroup(group.id)"
+                class="rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+              >{{ t('admin.groups.standby.role') }}</span>
+            </span>
           </div>
         </div>
       </Transition>
@@ -81,10 +89,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import GroupBadge from '@/components/common/GroupBadge.vue'
-import type { Group } from '@/types'
+import type { AccountGroupMembership, Group } from '@/types'
 
 interface Props {
   groups: Group[] | null | undefined
+  memberships?: AccountGroupMembership[] | null
   maxDisplay?: number
 }
 
@@ -97,6 +106,14 @@ const { t } = useI18n()
 const moreButtonRef = ref<HTMLElement | null>(null)
 const popoverRef = ref<HTMLElement | null>(null)
 const showPopover = ref(false)
+
+const standbyGroupIds = computed(() => new Set(
+  (props.memberships ?? [])
+    .filter((membership) => membership.role === 'standby')
+    .map((membership) => membership.group_id)
+))
+
+const isStandbyGroup = (groupId: number) => standbyGroupIds.value.has(groupId)
 
 // 显示的分组（最多显示 maxDisplay 个）
 const displayGroups = computed(() => {
