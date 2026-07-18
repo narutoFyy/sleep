@@ -18,7 +18,9 @@ func TestShouldAttemptStandby(t *testing.T) {
 		{name: "open circuit", selectionErr: service.ErrPrimaryCircuitOpen, want: true},
 		{name: "wrapped open circuit", selectionErr: errors.Join(errors.New("select failed"), service.ErrPrimaryCircuitOpen), want: true},
 		{name: "primary exhaustion after upstream failure", selectionErr: service.ErrNoAvailableAccounts, primaryFailureObserved: true, want: true},
-		{name: "capacity only", selectionErr: service.ErrNoAvailableAccounts, want: false},
+		{name: "no eligible primary accounts", selectionErr: service.ErrNoAvailableAccounts, want: true},
+		{name: "wrapped no eligible primary accounts", selectionErr: errors.Join(errors.New("select failed"), service.ErrNoAvailableAccounts), want: true},
+		{name: "unrelated selection error", selectionErr: errors.New("database unavailable"), want: false},
 		{name: "nil selection without upstream failure", selectionErr: nil, want: false},
 	}
 

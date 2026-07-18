@@ -6,7 +6,7 @@
 
 ## Current task
 
-All planned tasks are complete. The isolated candidate remains available on port 8084; production port 8090 was not changed.
+All planned tasks are complete. The repaired candidate remains available on port 8084; production port 8090 was not changed.
 
 ## Rules
 
@@ -36,20 +36,20 @@ All planned tasks are complete. The isolated candidate remains available on port
 | T-005 | Billing, audit and observability | done | T-004 | usage records, logs/metrics and focused tests | Original-model pricing and route audit tests |
 | T-006 | Admin standby configuration UI | done | T-001, T-004 | group/account admin API and `GroupsView.vue` related frontend modules | Typecheck, frontend tests and browser workflow |
 | T-007 | Full verification and port-8084 deployment | done | T-005, T-006 | tests/configuration and a separate 8084 deployment | Full test sweep, health checks, port/process inspection |
+| T-008 | OpenAI live failover repair and retest | done | T-007 | OpenAI Chat Completions transport handling, standby entry predicate, focused tests and isolated 8084 deployment | Unit tests plus real `cs` to `kun` transport-failure exercise |
 
 ## Active Task
 
-### T-007
+None. All planned tasks passed main verification.
 
-- Purpose: prove the complete failover and standby change against isolated infrastructure without changing production on port 8090.
-- Exact work: sync the reviewed source to `/root/cyproject/shitoutk`; run backend unit/integration tests, migration checks, frontend verification and a Docker build; create a dedicated database in `sub2api-test-db`; run the candidate as a separate container on port 8084 attached only to the test PostgreSQL/Redis network; inspect health, schema, admin UI and standby configuration workflow; compare the final 8090 container ID, image and start time with the recorded fingerprint.
-- Read/write scope: current repository changes, server test database/Redis, one new candidate image/container/database and `WORK_STATE.md`; no production database, Redis or 8090 container mutation.
-- Non-goals: no rollout to 8090, no production migration, no Nginx cutover and no unrelated test repair.
-- Acceptance: full focused backend/frontend checks pass; migrations 151/152 are applied to the isolated database; 8084 health and admin UI are usable at desktop/mobile widths; 8084 and 8090 are separate containers; 8090 fingerprint and health remain unchanged.
-- Focused verification: Go package/integration tests, frontend typecheck/Vitest/build, Docker build, HTTP health/API checks, PostgreSQL migration inspection, browser screenshots and final Docker/port inspection.
-- Compatibility: use `sub2api-test-db`, `sub2api-test-redis` and a dedicated database; remove no long-running test infrastructure.
-- Completion evidence: backend full tests and PostgreSQL migration/integration tests passed; frontend typecheck, focused Vitest and production build passed; desktop/mobile admin workflow and persisted standby values were verified; 8084 is healthy on `sub2api-test-net`; 8090 retained container `49b39f96db32e69aca3a21bd3a68cdc69e03f575b4f15ba1e0139d46757a4a3e`, image `sub2api-shitou:shitoutk-prod-20260712-005914` and start time `2026-07-11T17:16:40.931017036Z`.
-- Known unrelated test state: the full frontend Vitest suite has 15 pre-existing failures in usage/chart/image-billing/page-size tests; all T-006 focused tests pass.
+## Latest Completion Evidence
+
+### T-008
+
+- Purpose: fix two gaps found by real-key verification: TCP/DNS/TLS failures committed a 502 before account switching, and a new request did not enter standby when all primary accounts were globally unavailable.
+- Exact work: route both Chat Completions upstream transport paths through the existing OpenAI transport-failover helper; permit standby selection for `ErrNoAvailableAccounts`; add focused regressions; enable pool mode with zero same-account retries for the two 8084 relay accounts; rebuild and re-run real transport failure against `cs` with `kun` as standby.
+- Non-goals: no 8090 deployment or production data change.
+- Completion evidence: both `cs` and `kun` have `pool_mode=true` and `pool_mode_retry_count=0`; real TCP refusal on `cs` failed over to `kun` without committing the intermediate 502; a subsequent request while `cs` was unavailable entered standby directly; after restoring `cs`, its real upstream 502 also failed over to `kun`; full `go test ./...` passed on the server with Go 1.26.4.
 
 ## File Access Requests
 
@@ -95,4 +95,8 @@ All planned tasks are complete. The isolated candidate remains available on port
 - 2026-07-18: Verified standby configuration save/reload and mobile layout, including persisted `standby`, enabled, priority `3` and explicit Claude model mapping.
 - 2026-07-18: Rechecked 8084/8090 health and container/network separation; 8086/8087 remain closed and the single source backup remains intact.
 - 2026-07-18: `T-007 implementing -> self_check -> main_verify -> done`; work status set to `complete`.
+- 2026-07-18: Live 8084 testing found OpenAI Chat Completions transport errors returned 502 before failover and globally unschedulable primaries did not re-enter standby; `T-008 implementing`.
+- 2026-07-18: Enabled pool mode with zero same-account retries for 8084 accounts `cs` and `kun`; account URLs and keys were left unchanged.
+- 2026-07-18: Verified real-key standby routing for injected connection refusal, already-unavailable primary entry, and a real restored-primary upstream 502; all client requests completed through `kun` with standby audit records.
+- 2026-07-18: Full backend `go test ./...` passed; `T-008 implementing -> self_check -> main_verify -> done`; work status set to `complete`.
 - 2026-07-18: Assigned `T-004` to child agent; `assigned -> implementing`.

@@ -1585,7 +1585,9 @@ func claudeAttemptCommitted(c *gin.Context, tracker *service.PreContentTracker, 
 }
 
 func shouldAttemptStandby(selectionErr error, primaryFailureObserved bool) bool {
-	return primaryFailureObserved || errors.Is(selectionErr, service.ErrPrimaryCircuitOpen)
+	return primaryFailureObserved ||
+		errors.Is(selectionErr, service.ErrPrimaryCircuitOpen) ||
+		errors.Is(selectionErr, service.ErrNoAvailableAccounts)
 }
 
 func claudeResponseStreamStarted(c *gin.Context, explicit bool) bool {
