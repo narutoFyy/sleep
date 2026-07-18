@@ -43,11 +43,14 @@ func TestBuildSchedulerMetadataAccount_KeepsSlimGroupMembership(t *testing.T) {
 		GroupIDs: []int64{7, 9, 7, 0},
 		AccountGroups: []service.AccountGroup{
 			{
-				AccountID: 42,
-				GroupID:   7,
-				Priority:  2,
-				Account:   &service.Account{ID: 42, Name: "drop-from-metadata"},
-				Group:     &service.Group{ID: 7, Name: "drop-from-metadata"},
+				AccountID:    42,
+				GroupID:      7,
+				Priority:     2,
+				Role:         service.AccountGroupRoleStandby,
+				Enabled:      false,
+				ModelMapping: map[string]string{"claude-opus-*": "claude-sonnet-4-6"},
+				Account:      &service.Account{ID: 42, Name: "drop-from-metadata"},
+				Group:        &service.Group{ID: 7, Name: "drop-from-metadata"},
 			},
 			{
 				AccountID: 42,
@@ -70,6 +73,9 @@ func TestBuildSchedulerMetadataAccount_KeepsSlimGroupMembership(t *testing.T) {
 	require.Equal(t, int64(42), got.AccountGroups[0].AccountID)
 	require.Equal(t, int64(7), got.AccountGroups[0].GroupID)
 	require.Equal(t, 2, got.AccountGroups[0].Priority)
+	require.Equal(t, service.AccountGroupRoleStandby, got.AccountGroups[0].Role)
+	require.False(t, got.AccountGroups[0].Enabled)
+	require.Equal(t, map[string]string{"claude-opus-*": "claude-sonnet-4-6"}, got.AccountGroups[0].ModelMapping)
 	require.Nil(t, got.AccountGroups[0].Account)
 	require.Nil(t, got.AccountGroups[0].Group)
 	require.Equal(t, int64(11), got.AccountGroups[1].GroupID)

@@ -261,10 +261,13 @@ type Account struct {
 }
 
 type AccountGroup struct {
-	AccountID int64     `json:"account_id"`
-	GroupID   int64     `json:"group_id"`
-	Priority  int       `json:"priority"`
-	CreatedAt time.Time `json:"created_at"`
+	AccountID    int64             `json:"account_id"`
+	GroupID      int64             `json:"group_id"`
+	Priority     int               `json:"priority"`
+	Role         string            `json:"role"`
+	Enabled      bool              `json:"enabled"`
+	ModelMapping map[string]string `json:"model_mapping"`
+	CreatedAt    time.Time         `json:"created_at"`
 
 	Account *Account `json:"account,omitempty"`
 	Group   *Group   `json:"group,omitempty"`
@@ -424,13 +427,24 @@ type BatchUpdateRedeemCodesRequest struct {
 }
 
 // UsageLog 是普通用户接口使用的 usage log DTO（不包含管理员字段）。
+type RouteFailureEntry struct {
+	AccountID  int64  `json:"account_id"`
+	Standby    bool   `json:"standby"`
+	StatusCode int    `json:"status_code"`
+	Kind       string `json:"kind"`
+}
+
 type UsageLog struct {
-	ID        int64  `json:"id"`
-	UserID    int64  `json:"user_id"`
-	APIKeyID  int64  `json:"api_key_id"`
-	AccountID int64  `json:"account_id"`
-	RequestID string `json:"request_id"`
-	Model     string `json:"model"`
+	ID                int64               `json:"id"`
+	UserID            int64               `json:"user_id"`
+	APIKeyID          int64               `json:"api_key_id"`
+	AccountID         int64               `json:"account_id"`
+	RequestID         string              `json:"request_id"`
+	Model             string              `json:"model"`
+	RouteMode         string              `json:"route_mode"`
+	RouteMappingRule  *string             `json:"route_mapping_rule,omitempty"`
+	RouteAttemptCount int                 `json:"route_attempt_count"`
+	RouteFailures     []RouteFailureEntry `json:"route_failures"`
 	// ServiceTier records the OpenAI service tier used for billing, e.g. "priority" / "flex".
 	ServiceTier *string `json:"service_tier,omitempty"`
 	// ReasoningEffort is the request's reasoning effort level.

@@ -78,6 +78,40 @@ func (_u *AccountGroupUpdate) AddPriority(v int) *AccountGroupUpdate {
 	return _u
 }
 
+// SetRole sets the "role" field.
+func (_u *AccountGroupUpdate) SetRole(v accountgroup.Role) *AccountGroupUpdate {
+	_u.mutation.SetRole(v)
+	return _u
+}
+
+// SetNillableRole sets the "role" field if the given value is not nil.
+func (_u *AccountGroupUpdate) SetNillableRole(v *accountgroup.Role) *AccountGroupUpdate {
+	if v != nil {
+		_u.SetRole(*v)
+	}
+	return _u
+}
+
+// SetEnabled sets the "enabled" field.
+func (_u *AccountGroupUpdate) SetEnabled(v bool) *AccountGroupUpdate {
+	_u.mutation.SetEnabled(v)
+	return _u
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_u *AccountGroupUpdate) SetNillableEnabled(v *bool) *AccountGroupUpdate {
+	if v != nil {
+		_u.SetEnabled(*v)
+	}
+	return _u
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (_u *AccountGroupUpdate) SetModelMapping(v map[string]string) *AccountGroupUpdate {
+	_u.mutation.SetModelMapping(v)
+	return _u
+}
+
 // SetAccount sets the "account" edge to the Account entity.
 func (_u *AccountGroupUpdate) SetAccount(v *Account) *AccountGroupUpdate {
 	return _u.SetAccountID(v.ID)
@@ -134,6 +168,11 @@ func (_u *AccountGroupUpdate) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *AccountGroupUpdate) check() error {
+	if v, ok := _u.mutation.Role(); ok {
+		if err := accountgroup.RoleValidator(v); err != nil {
+			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.role": %w`, err)}
+		}
+	}
 	if _u.mutation.AccountCleared() && len(_u.mutation.AccountIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "AccountGroup.account"`)
 	}
@@ -160,6 +199,15 @@ func (_u *AccountGroupUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if value, ok := _u.mutation.AddedPriority(); ok {
 		_spec.AddField(accountgroup.FieldPriority, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Role(); ok {
+		_spec.SetField(accountgroup.FieldRole, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.Enabled(); ok {
+		_spec.SetField(accountgroup.FieldEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ModelMapping(); ok {
+		_spec.SetField(accountgroup.FieldModelMapping, field.TypeJSON, value)
 	}
 	if _u.mutation.AccountCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -288,6 +336,40 @@ func (_u *AccountGroupUpdateOne) AddPriority(v int) *AccountGroupUpdateOne {
 	return _u
 }
 
+// SetRole sets the "role" field.
+func (_u *AccountGroupUpdateOne) SetRole(v accountgroup.Role) *AccountGroupUpdateOne {
+	_u.mutation.SetRole(v)
+	return _u
+}
+
+// SetNillableRole sets the "role" field if the given value is not nil.
+func (_u *AccountGroupUpdateOne) SetNillableRole(v *accountgroup.Role) *AccountGroupUpdateOne {
+	if v != nil {
+		_u.SetRole(*v)
+	}
+	return _u
+}
+
+// SetEnabled sets the "enabled" field.
+func (_u *AccountGroupUpdateOne) SetEnabled(v bool) *AccountGroupUpdateOne {
+	_u.mutation.SetEnabled(v)
+	return _u
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_u *AccountGroupUpdateOne) SetNillableEnabled(v *bool) *AccountGroupUpdateOne {
+	if v != nil {
+		_u.SetEnabled(*v)
+	}
+	return _u
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (_u *AccountGroupUpdateOne) SetModelMapping(v map[string]string) *AccountGroupUpdateOne {
+	_u.mutation.SetModelMapping(v)
+	return _u
+}
+
 // SetAccount sets the "account" edge to the Account entity.
 func (_u *AccountGroupUpdateOne) SetAccount(v *Account) *AccountGroupUpdateOne {
 	return _u.SetAccountID(v.ID)
@@ -357,6 +439,11 @@ func (_u *AccountGroupUpdateOne) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *AccountGroupUpdateOne) check() error {
+	if v, ok := _u.mutation.Role(); ok {
+		if err := accountgroup.RoleValidator(v); err != nil {
+			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.role": %w`, err)}
+		}
+	}
 	if _u.mutation.AccountCleared() && len(_u.mutation.AccountIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "AccountGroup.account"`)
 	}
@@ -402,6 +489,15 @@ func (_u *AccountGroupUpdateOne) sqlSave(ctx context.Context) (_node *AccountGro
 	}
 	if value, ok := _u.mutation.AddedPriority(); ok {
 		_spec.AddField(accountgroup.FieldPriority, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Role(); ok {
+		_spec.SetField(accountgroup.FieldRole, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.Enabled(); ok {
+		_spec.SetField(accountgroup.FieldEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ModelMapping(); ok {
+		_spec.SetField(accountgroup.FieldModelMapping, field.TypeJSON, value)
 	}
 	if _u.mutation.AccountCleared() {
 		edge := &sqlgraph.EdgeSpec{

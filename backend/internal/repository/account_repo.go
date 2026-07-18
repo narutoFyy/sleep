@@ -868,6 +868,10 @@ func (r *accountRepository) GetGroups(ctx context.Context, accountID int64) ([]s
 }
 
 func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error {
+	return r.BindAccountGroups(ctx, accountID, service.LegacyAccountGroupMemberships(groupIDs))
+}
+
+func (r *accountRepository) BindAccountGroups(ctx context.Context, accountID int64, memberships []service.AccountGroup) error {
 	existingGroupIDs, err := r.loadAccountGroupIDs(ctx, accountID)
 	if err != nil {
 		return err
@@ -891,19 +895,32 @@ func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, gro
 		return err
 	}
 
-	if len(groupIDs) == 0 {
+	if len(memberships) == 0 {
 		if tx != nil {
 			return tx.Commit()
 		}
 		return nil
 	}
 
-	builders := make([]*dbent.AccountGroupCreate, 0, len(groupIDs))
-	for i, groupID := range groupIDs {
+	builders := make([]*dbent.AccountGroupCreate, 0, len(memberships))
+	groupIDs := make([]int64, 0, len(memberships))
+	for _, membership := range memberships {
+		role := membership.Role
+		if role == "" {
+			role = service.AccountGroupRolePrimary
+		}
+		modelMapping := membership.ModelMapping
+		if modelMapping == nil {
+			modelMapping = map[string]string{}
+		}
+		groupIDs = append(groupIDs, membership.GroupID)
 		builders = append(builders, txClient.AccountGroup.Create().
 			SetAccountID(accountID).
-			SetGroupID(groupID).
-			SetPriority(i+1),
+			SetGroupID(membership.GroupID).
+			SetPriority(membership.Priority).
+			SetRole(dbaccountgroup.Role(role)).
+			SetEnabled(membership.Enabled).
+			SetModelMapping(modelMapping),
 		)
 	}
 
@@ -1698,11 +1715,14 @@ func (r *accountRepository) loadAccountGroups(ctx context.Context, accountIDs []
 	for _, ag := range entries {
 		groupSvc := groupEntityToService(ag.Edges.Group)
 		agSvc := service.AccountGroup{
-			AccountID: ag.AccountID,
-			GroupID:   ag.GroupID,
-			Priority:  ag.Priority,
-			CreatedAt: ag.CreatedAt,
-			Group:     groupSvc,
+			AccountID:    ag.AccountID,
+			GroupID:      ag.GroupID,
+			Priority:     ag.Priority,
+			Role:         service.AccountGroupRole(ag.Role),
+			Enabled:      ag.Enabled,
+			ModelMapping: ag.ModelMapping,
+			CreatedAt:    ag.CreatedAt,
+			Group:        groupSvc,
 		}
 		accountGroupsByAccount[ag.AccountID] = append(accountGroupsByAccount[ag.AccountID], agSvc)
 		groupIDsByAccount[ag.AccountID] = append(groupIDsByAccount[ag.AccountID], ag.GroupID)

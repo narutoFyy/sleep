@@ -531,10 +531,15 @@ type AccountWaitPlan struct {
 }
 
 type AccountSelectionResult struct {
-	Account     *Account
-	Acquired    bool
-	ReleaseFunc func()
-	WaitPlan    *AccountWaitPlan // nil means no wait allowed
+	Account           *Account
+	Acquired          bool
+	ReleaseFunc       func()
+	WaitPlan          *AccountWaitPlan // nil means no wait allowed
+	Standby           bool
+	UpstreamModel     string
+	MappingRule       string
+	PrimaryProbe      bool
+	PrimaryAccountIDs []int64
 }
 
 // ClaudeUsage 表示Claude API返回的usage信息
@@ -638,6 +643,7 @@ type GatewayService struct {
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	primaryHealthService  *PrimaryHealthService
 }
 
 // NewGatewayService creates a new GatewayService
@@ -669,6 +675,7 @@ func NewGatewayService(
 	resolver *ModelPricingResolver,
 	balanceNotifyService *BalanceNotifyService,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
+	primaryHealthService *PrimaryHealthService,
 ) *GatewayService {
 	userGroupRateTTL := resolveUserGroupRateCacheTTL(cfg)
 	modelsListTTL := resolveModelsListCacheTTL(cfg)
@@ -705,6 +712,7 @@ func NewGatewayService(
 		resolver:              resolver,
 		balanceNotifyService:  balanceNotifyService,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
+		primaryHealthService:  primaryHealthService,
 	}
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		userGroupRateRepo,
@@ -1531,7 +1539,7 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 // SelectAccountWithLoadAwareness selects account with load-awareness and wait plan.
 // metadataUserID: 用于客户端亲和调度，从中提取客户端 ID
 // sub2apiUserID: 系统用户 ID，用于二维亲和调度
-func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, metadataUserID string, sub2apiUserID int64) (*AccountSelectionResult, error) {
+func (s *GatewayService) selectPrimaryAccountWithLoadAwareness(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, metadataUserID string, sub2apiUserID int64) (*AccountSelectionResult, error) {
 	// 调试日志：记录调度入口参数
 	excludedIDsList := make([]int64, 0, len(excludedIDs))
 	for id := range excludedIDs {
@@ -2373,7 +2381,7 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 				}
 			}
 		}
-		return accounts, useMixed, err
+		return filterEnabledPrimaryAccounts(accounts, groupID), useMixed, err
 	}
 	useMixed := (platform == PlatformAnthropic || platform == PlatformGemini) && !hasForcePlatform
 	if useMixed {
@@ -2417,7 +2425,7 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 					"tls_fingerprint", acc.IsTLSFingerprintEnabled())
 			}
 		}
-		return filtered, useMixed, nil
+		return filterEnabledPrimaryAccounts(filtered, groupID), useMixed, nil
 	}
 
 	var accounts []Account
@@ -2452,7 +2460,7 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 				"tls_fingerprint", acc.IsTLSFingerprintEnabled())
 		}
 	}
-	return accounts, useMixed, nil
+	return filterEnabledPrimaryAccounts(accounts, groupID), useMixed, nil
 }
 
 // IsSingleAntigravityAccountGroup 检查指定分组是否只有一个 antigravity 平台的可调度账号。
@@ -2496,19 +2504,7 @@ func (s *GatewayService) isAccountSchedulableForModelSelection(ctx context.Conte
 // isAccountInGroup checks if the account belongs to the specified group.
 // When groupID is nil, returns true only for ungrouped accounts (no group assignments).
 func (s *GatewayService) isAccountInGroup(account *Account, groupID *int64) bool {
-	if account == nil {
-		return false
-	}
-	if groupID == nil {
-		// 无分组的 API Key 只能使用未分组的账号
-		return len(account.AccountGroups) == 0
-	}
-	for _, ag := range account.AccountGroups {
-		if ag.GroupID == *groupID {
-			return true
-		}
-	}
-	return false
+	return enabledPrimaryMembership(account, groupID)
 }
 
 func (s *GatewayService) tryAcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int) (*AcquireResult, error) {
@@ -4507,7 +4503,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			Body:          passthroughBody,
 			Parsed:        parsed,
 			RequestModel:  passthroughModel,
-			OriginalModel: parsed.Model,
+			OriginalModel: clientModelFromContext(ctx, parsed.Model),
 			RequestStream: parsed.Stream,
 			StartTime:     startTime,
 		})
@@ -4541,7 +4537,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 	reqModel := parsed.Model
 	reqStream := parsed.Stream
-	originalModel := reqModel
+	originalModel := clientModelFromContext(ctx, reqModel)
 
 	// === DEBUG: 打印客户端原始请求（headers + body 摘要）===
 	if c != nil {
@@ -4729,6 +4725,12 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				Kind:               "request_error",
 				Message:            safeErr,
 			})
+			if tracker := PreContentTrackerFromContext(ctx); tracker != nil && !tracker.HasEffectiveContent() {
+				if IsPreContentRoutingDeadline(ctx) {
+					return nil, ErrPreContentRoutingDeadline
+				}
+				return nil, newAnthropicStreamFailoverError("upstream_connection_error", "Upstream request failed before content")
+			}
 			c.JSON(http.StatusBadGateway, gin.H{
 				"type": "error",
 				"error": gin.H{
@@ -5259,6 +5261,12 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				Kind:               "request_error",
 				Message:            safeErr,
 			})
+			if tracker := PreContentTrackerFromContext(ctx); tracker != nil && !tracker.HasEffectiveContent() {
+				if IsPreContentRoutingDeadline(ctx) {
+					return nil, ErrPreContentRoutingDeadline
+				}
+				return nil, newAnthropicStreamFailoverError("upstream_connection_error", "Upstream request failed before content")
+			}
 			c.JSON(http.StatusBadGateway, gin.H{
 				"type": "error",
 				"error": gin.H{
@@ -5535,6 +5543,7 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.cfg.Gateway.MaxLineSize
 	}
+	attemptBuffer := newAnthropicAttemptBuffer(ctx, maxLineSize)
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
 
@@ -5597,15 +5606,68 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 		keepaliveCh = keepaliveTicker.C
 	}
 	lastDataAt := time.Now()
-	inPartialEvent := false
+	pendingEventLines := make([]string, 0, 4)
+	legacyImmediate := PreContentTrackerFromContext(ctx) == nil
+	legacyPartialEvent := false
+
+	writePendingEvent := func(lines []string) error {
+		if len(lines) == 0 {
+			return nil
+		}
+		block := strings.Join(lines, "\n") + "\n\n"
+		for _, line := range lines {
+			if data, ok := extractAnthropicSSEDataLine(line); ok {
+				trimmed := strings.TrimSpace(data)
+				if anthropicStreamEventIsTerminal("", trimmed) {
+					sawTerminalEvent = true
+				}
+				s.parseSSEUsagePassthrough(data, usage)
+				continue
+			}
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "event:") && anthropicStreamEventIsTerminal(strings.TrimSpace(strings.TrimPrefix(trimmed, "event:")), "") {
+				sawTerminalEvent = true
+			}
+		}
+
+		restored := reverseToolNamesIfPresent(c, []byte(block))
+		output, committedNow, err := attemptBuffer.Accept(restored)
+		if err != nil {
+			return err
+		}
+		if committedNow && firstTokenMs == nil {
+			ms := int(time.Since(startTime).Milliseconds())
+			firstTokenMs = &ms
+		}
+		if clientDisconnected || len(output) == 0 {
+			return nil
+		}
+		if _, err := w.Write(output); err != nil {
+			clientDisconnected = true
+			logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] Client disconnected during streaming, continue draining upstream for usage: account=%d", account.ID)
+			return nil
+		}
+		flusher.Flush()
+		lastDataAt = time.Now()
+		return nil
+	}
 
 	for {
 		select {
 		case ev, ok := <-events:
 			if !ok {
-				if !clientDisconnected {
-					// 兜底补刷，确保最后一个未以空行结尾的事件也能及时送达客户端。
-					flusher.Flush()
+				if len(pendingEventLines) > 0 {
+					if err := writePendingEvent(pendingEventLines); err != nil {
+						if errors.Is(err, ErrPreContentRoutingDeadline) {
+							return nil, ErrPreContentRoutingDeadline
+						}
+						return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
+					}
+					pendingEventLines = pendingEventLines[:0]
+				}
+				if !attemptBuffer.Committed() {
+					attemptBuffer.Discard()
+					return nil, newAnthropicStreamFailoverError("upstream_empty_stream", "Upstream stream ended before content")
 				}
 				if !sawTerminalEvent {
 					if clientDisconnected && streamInterval > 0 {
@@ -5619,6 +5681,14 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 				return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
 			}
 			if ev.err != nil {
+				if IsPreContentRoutingDeadline(ctx) {
+					attemptBuffer.Discard()
+					return nil, ErrPreContentRoutingDeadline
+				}
+				if !attemptBuffer.Committed() {
+					attemptBuffer.Discard()
+					return nil, newAnthropicStreamFailoverError("upstream_disconnected", "Upstream stream disconnected before content")
+				}
 				if sawTerminalEvent {
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
 				}
@@ -5636,40 +5706,49 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 			}
 
 			line := ev.line
-			if data, ok := extractAnthropicSSEDataLine(line); ok {
-				trimmed := strings.TrimSpace(data)
-				if anthropicStreamEventIsTerminal("", trimmed) {
-					sawTerminalEvent = true
-				}
-				if firstTokenMs == nil && trimmed != "" && trimmed != "[DONE]" {
-					ms := int(time.Since(startTime).Milliseconds())
-					firstTokenMs = &ms
-				}
-				s.parseSSEUsagePassthrough(data, usage)
-			} else {
-				trimmed := strings.TrimSpace(line)
-				if strings.HasPrefix(trimmed, "event:") && anthropicStreamEventIsTerminal(strings.TrimSpace(strings.TrimPrefix(trimmed, "event:")), "") {
-					sawTerminalEvent = true
-				}
-			}
-
-			if !clientDisconnected {
-				restored := string(reverseToolNamesIfPresent(c, []byte(line)))
-				if _, err := io.WriteString(w, restored); err != nil {
-					clientDisconnected = true
-					logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] Client disconnected during streaming, continue draining upstream for usage: account=%d", account.ID)
-				} else if _, err := io.WriteString(w, "\n"); err != nil {
-					clientDisconnected = true
-					logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] Client disconnected during streaming, continue draining upstream for usage: account=%d", account.ID)
-				} else if line == "" {
-					// 按 SSE 事件边界刷出，减少每行 flush 带来的 syscall 开销。
-					flusher.Flush()
-					lastDataAt = time.Now()
-					inPartialEvent = false
+			if legacyImmediate {
+				if data, ok := extractAnthropicSSEDataLine(line); ok {
+					trimmed := strings.TrimSpace(data)
+					if anthropicStreamEventIsTerminal("", trimmed) {
+						sawTerminalEvent = true
+					}
+					s.parseSSEUsagePassthrough(data, usage)
 				} else {
-					inPartialEvent = true
+					trimmed := strings.TrimSpace(line)
+					if strings.HasPrefix(trimmed, "event:") && anthropicStreamEventIsTerminal(strings.TrimSpace(strings.TrimPrefix(trimmed, "event:")), "") {
+						sawTerminalEvent = true
+					}
 				}
+				if !clientDisconnected {
+					restored := string(reverseToolNamesIfPresent(c, []byte(line)))
+					if _, err := io.WriteString(w, restored+"\n"); err != nil {
+						clientDisconnected = true
+						logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] Client disconnected during streaming, continue draining upstream for usage: account=%d", account.ID)
+					} else if line == "" {
+						flusher.Flush()
+						lastDataAt = time.Now()
+						legacyPartialEvent = false
+					} else {
+						legacyPartialEvent = true
+					}
+				}
+				continue
 			}
+			if strings.TrimSpace(line) != "" {
+				pendingEventLines = append(pendingEventLines, line)
+				continue
+			}
+			if len(pendingEventLines) == 0 {
+				continue
+			}
+			if err := writePendingEvent(pendingEventLines); err != nil {
+				pendingEventLines = pendingEventLines[:0]
+				if errors.Is(err, ErrPreContentRoutingDeadline) {
+					return nil, ErrPreContentRoutingDeadline
+				}
+				return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
+			}
+			pendingEventLines = pendingEventLines[:0]
 
 		case <-intervalCh:
 			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
@@ -5679,6 +5758,13 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 			if clientDisconnected {
 				return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: true}, fmt.Errorf("stream usage incomplete after timeout")
 			}
+			if !attemptBuffer.Committed() {
+				attemptBuffer.Discard()
+				if s.rateLimitService != nil {
+					s.rateLimitService.HandleStreamTimeout(ctx, account, model)
+				}
+				return nil, newAnthropicStreamFailoverError("stream_timeout", fmt.Sprintf("upstream stream idle for %s before content", streamInterval))
+			}
 			logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] Stream data interval timeout: account=%d model=%s interval=%s", account.ID, model, streamInterval)
 			if s.rateLimitService != nil {
 				s.rateLimitService.HandleStreamTimeout(ctx, account, model)
@@ -5686,7 +5772,7 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 			return &streamingResult{usage: usage, firstTokenMs: firstTokenMs}, fmt.Errorf("stream data interval timeout")
 
 		case <-keepaliveCh:
-			if clientDisconnected || inPartialEvent {
+			if clientDisconnected || legacyPartialEvent || len(pendingEventLines) > 0 {
 				continue
 			}
 			if time.Since(lastDataAt) < keepaliveInterval {
@@ -5699,6 +5785,13 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 			}
 			flusher.Flush()
 			lastDataAt = time.Now()
+
+		case <-ctx.Done():
+			if IsPreContentRoutingDeadline(ctx) {
+				attemptBuffer.Discard()
+				return nil, ErrPreContentRoutingDeadline
+			}
+			return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: true}, fmt.Errorf("stream canceled: %w", context.Cause(ctx))
 		}
 	}
 }
@@ -5845,6 +5938,12 @@ func (s *GatewayService) handleNonStreamingResponseAnthropicAPIKeyPassthrough(
 		contentType = "application/json"
 	}
 	body = reverseToolNamesIfPresent(c, body)
+	if tracker := PreContentTrackerFromContext(ctx); tracker != nil && !tracker.MarkEffectiveContent() {
+		if tracker.DeadlineExceeded() {
+			return nil, ErrPreContentRoutingDeadline
+		}
+		return nil, context.Cause(tracker.Context())
+	}
 	c.Data(resp.StatusCode, contentType, body)
 	return usage, nil
 }
@@ -7628,6 +7727,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.cfg.Gateway.MaxLineSize
 	}
+	attemptBuffer := newAnthropicAttemptBuffer(ctx, maxLineSize)
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
 
@@ -7857,6 +7957,10 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 		select {
 		case ev, ok := <-events:
 			if !ok {
+				if !attemptBuffer.Committed() {
+					attemptBuffer.Discard()
+					return nil, newAnthropicStreamFailoverError("upstream_empty_stream", "Upstream stream ended before content")
+				}
 				// 上游完成，返回结果
 				if !sawTerminalEvent {
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, fmt.Errorf("stream usage incomplete: missing terminal event")
@@ -7864,6 +7968,14 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 				return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
 			}
 			if ev.err != nil {
+				if IsPreContentRoutingDeadline(ctx) {
+					attemptBuffer.Discard()
+					return nil, ErrPreContentRoutingDeadline
+				}
+				if !attemptBuffer.Committed() {
+					attemptBuffer.Discard()
+					return nil, newAnthropicStreamFailoverError("upstream_disconnected", "Upstream stream disconnected before content")
+				}
 				if sawTerminalEvent {
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
 				}
@@ -7881,28 +7993,12 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 					sendErrorEvent("response_too_large", fmt.Sprintf("upstream SSE line exceeded %d bytes", maxLineSize))
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs}, ev.err
 				}
-				// 上游中途读错误（unexpected EOF / connection reset 等，常见于 HTTP/2 GOAWAY）：
-				// 若尚未向客户端写过任何字节，包成 UpstreamFailoverError 让 handler 层走 failover/重试。
-				// 已经开始写流时 SSE 协议无 resume，只能透传错误事件给客户端。
+				// 上游中途读错误（unexpected EOF / connection reset 等，常见于 HTTP/2 GOAWAY）。
+				// 此处已提交有效内容，SSE 协议无 resume，只能透传错误事件给客户端。
 				// 注意:面向客户端的 disconnectMsg 必须用 sanitizeStreamError 剥离地址,
 				// 默认 *net.OpError 的 Error() 会泄露内部 IP/端口和上游地址。完整 ev.err
 				// 仅在下方 LegacyPrintf 内部日志中保留供运维诊断。
 				disconnectMsg := "upstream stream disconnected: " + sanitizeStreamError(ev.err)
-				if !c.Writer.Written() {
-					logger.LegacyPrintf("service.gateway", "Upstream stream read error before any client output (account=%d), failing over: %v", account.ID, ev.err)
-					body, _ := json.Marshal(map[string]any{
-						"type": "error",
-						"error": map[string]string{
-							"type":    "upstream_disconnected",
-							"message": disconnectMsg,
-						},
-					})
-					return nil, &UpstreamFailoverError{
-						StatusCode:             http.StatusBadGateway,
-						ResponseBody:           body,
-						RetryableOnSameAccount: true,
-					}
-				}
 				sendErrorEvent("stream_read_error", disconnectMsg)
 				return &streamingResult{usage: usage, firstTokenMs: firstTokenMs}, fmt.Errorf("stream read error: %w", ev.err)
 			}
@@ -7920,28 +8016,40 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 					if clientDisconnected {
 						return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: true}, nil
 					}
+					if !attemptBuffer.Committed() {
+						attemptBuffer.Discard()
+						return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
+					}
 					return nil, err
 				}
 
 				for _, block := range outputBlocks {
+					restored := reverseToolNamesIfPresent(c, []byte(block))
+					output, committedNow, bufferErr := attemptBuffer.Accept(restored)
+					if bufferErr != nil {
+						if errors.Is(bufferErr, ErrPreContentRoutingDeadline) {
+							return nil, ErrPreContentRoutingDeadline
+						}
+						return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
+					}
+					if data != "" && usagePatch != nil {
+						mergeSSEUsagePatch(usage, usagePatch)
+					}
+					if committedNow && firstTokenMs == nil {
+						ms := int(time.Since(startTime).Milliseconds())
+						firstTokenMs = &ms
+					}
+					if len(output) == 0 {
+						continue
+					}
 					if !clientDisconnected {
-						restored := reverseToolNamesIfPresent(c, []byte(block))
-						if _, werr := fmt.Fprint(w, string(restored)); werr != nil {
+						if _, werr := w.Write(output); werr != nil {
 							clientDisconnected = true
 							logger.LegacyPrintf("service.gateway", "Client disconnected during streaming, continuing to drain upstream for billing")
 							break
 						}
 						flusher.Flush()
 						lastDataAt = time.Now()
-					}
-					if data != "" {
-						if firstTokenMs == nil && data != "[DONE]" {
-							ms := int(time.Since(startTime).Milliseconds())
-							firstTokenMs = &ms
-						}
-						if usagePatch != nil {
-							mergeSSEUsagePatch(usage, usagePatch)
-						}
 					}
 				}
 				continue
@@ -7956,6 +8064,13 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 			}
 			if clientDisconnected {
 				return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: true}, fmt.Errorf("stream usage incomplete after timeout")
+			}
+			if !attemptBuffer.Committed() {
+				attemptBuffer.Discard()
+				if s.rateLimitService != nil {
+					s.rateLimitService.HandleStreamTimeout(ctx, account, originalModel)
+				}
+				return nil, newAnthropicStreamFailoverError("stream_timeout", fmt.Sprintf("upstream stream idle for %s before content", streamInterval))
 			}
 			logger.LegacyPrintf("service.gateway", "Stream data interval timeout: account=%d model=%s interval=%s", account.ID, originalModel, streamInterval)
 			// 处理流超时，可能标记账户为临时不可调度或错误状态
@@ -7980,6 +8095,13 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 				continue
 			}
 			flusher.Flush()
+
+		case <-ctx.Done():
+			if IsPreContentRoutingDeadline(ctx) {
+				attemptBuffer.Discard()
+				return nil, ErrPreContentRoutingDeadline
+			}
+			return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: true}, fmt.Errorf("stream canceled: %w", context.Cause(ctx))
 		}
 	}
 
@@ -8282,6 +8404,12 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 	}
 
 	body = reverseToolNamesIfPresent(c, body)
+	if tracker := PreContentTrackerFromContext(ctx); tracker != nil && !tracker.MarkEffectiveContent() {
+		if tracker.DeadlineExceeded() {
+			return nil, ErrPreContentRoutingDeadline
+		}
+		return nil, context.Cause(tracker.Context())
+	}
 
 	// 写入响应
 	c.Data(resp.StatusCode, contentType, body)
@@ -8335,6 +8463,7 @@ type RecordUsageInput struct {
 	ForceCacheBilling  bool               // 强制缓存计费：将 input_tokens 转为 cache_read 计费（用于粘性会话切换）
 	APIKeyService      APIKeyQuotaUpdater // 可选：用于更新API Key配额
 	QuotaPlatform      string             // user×platform 配额计量平台：handler 在请求 ctx 内经 QuotaPlatform() 算定后传入（后扣运行在 worker 池 background ctx 上，取不到 ForcePlatform）
+	RouteAudit         RouteAudit
 
 	ChannelUsageFields // 渠道映射信息（由 handler 在 Forward 前解析）
 }
@@ -8740,6 +8869,9 @@ func detachStreamUpstreamContext(ctx context.Context, stream bool) (context.Cont
 	if !stream {
 		return ctx, func() {}
 	}
+	if PreContentTrackerFromContext(ctx) != nil {
+		return ctx, func() {}
+	}
 	return context.WithoutCancel(ctx), func() {}
 }
 
@@ -8823,6 +8955,7 @@ func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInpu
 		ForceCacheBilling:  input.ForceCacheBilling,
 		APIKeyService:      input.APIKeyService,
 		QuotaPlatform:      input.QuotaPlatform,
+		RouteAudit:         input.RouteAudit,
 		ChannelUsageFields: input.ChannelUsageFields,
 	}, &recordUsageOpts{})
 }
@@ -8886,12 +9019,14 @@ type recordUsageCoreInput struct {
 	ForceCacheBilling  bool
 	APIKeyService      APIKeyQuotaUpdater
 	QuotaPlatform      string
+	RouteAudit         RouteAudit
 	ChannelUsageFields
 }
 
 // recordUsageCore 是 RecordUsage 和 RecordUsageWithLongContext 的统一实现。
 // LongContextThreshold > 0 时 Token 计费回退走 CalculateCostWithLongContext。
 func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsageCoreInput, opts *recordUsageOpts) error {
+	input.RouteAudit = input.RouteAudit.Snapshot()
 	result := input.Result
 	apiKey := input.APIKey
 	user := input.User
@@ -8935,6 +9070,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	if input.BillingModelSource == BillingModelSourceRequested && input.OriginalModel != "" {
 		billingModel = input.OriginalModel
 	}
+	billingModel = standbyBillingModel(input.RouteAudit, input.ChannelUsageFields, billingModel)
 
 	// 确定 RequestedModel（渠道映射前的原始模型）
 	requestedModel := result.Model
@@ -8976,6 +9112,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
+		logRouteCompletion("service.gateway", usageLog)
 		logger.LegacyPrintf("service.gateway", "[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
 		s.deferredService.ScheduleLastUsedUpdate(account.ID)
 		return nil
@@ -9006,6 +9143,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		return billingErr
 	}
 	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
+	logRouteCompletion("service.gateway", usageLog)
 
 	return nil
 }
@@ -9201,6 +9339,10 @@ func (s *GatewayService) buildRecordUsageLog(
 		GroupID:               apiKey.GroupID,
 		SubscriptionID:        optionalSubscriptionID(subscription),
 		CreatedAt:             time.Now(),
+		RouteMode:             input.RouteAudit.Mode,
+		RouteMappingRule:      optionalTrimmedStringPtr(input.RouteAudit.MappingRule),
+		RouteAttemptCount:     input.RouteAudit.Attempts,
+		RouteFailures:         append([]RouteFailureEntry(nil), input.RouteAudit.Failures...),
 	}
 	if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier

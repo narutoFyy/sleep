@@ -90,6 +90,10 @@ func TestUsageLogRepositoryCreateSyncRequestTypeAndLegacyFields(t *testing.T) {
 			sqlmock.AnyArg(), // billing_tier
 			sqlmock.AnyArg(), // billing_mode
 			sqlmock.AnyArg(), // account_stats_cost
+			service.RouteModePrimary,
+			sqlmock.AnyArg(), // route_mapping_rule
+			1,
+			"[]",
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(99), createdAt))
@@ -173,6 +177,10 @@ func TestUsageLogRepositoryCreate_PersistsServiceTier(t *testing.T) {
 			sqlmock.AnyArg(), // billing_tier
 			sqlmock.AnyArg(), // billing_mode
 			sqlmock.AnyArg(), // account_stats_cost
+			service.RouteModePrimary,
+			sqlmock.AnyArg(), // route_mapping_rule
+			1,
+			"[]",
 			createdAt,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(100), createdAt))
@@ -236,6 +244,41 @@ func TestPrepareUsageLogInsert_ArgCountMatchesTypes(t *testing.T) {
 	})
 
 	require.Len(t, prepared.args, len(usageLogInsertArgTypes))
+}
+
+func TestPrepareUsageLogInsert_PersistsActualRouteAuditOnSingleUsageRow(t *testing.T) {
+	upstreamModel := "gpt-5.4"
+	mappingRule := "gpt-5.1 -> gpt-5.4"
+	prepared := prepareUsageLogInsert(&service.UsageLog{
+		UserID:            1,
+		APIKeyID:          2,
+		AccountID:         303,
+		RequestID:         "req-route-audit",
+		Model:             "gpt-5.1",
+		RequestedModel:    "gpt-5.1",
+		UpstreamModel:     &upstreamModel,
+		RouteMode:         service.RouteModeStandby,
+		RouteMappingRule:  &mappingRule,
+		RouteAttemptCount: 3,
+		RouteFailures: []service.RouteFailureEntry{
+			{AccountID: 101, StatusCode: 502, Kind: "raw upstream secret"},
+			{AccountID: 202, Standby: true, StatusCode: 429, Kind: "rate_limited"},
+		},
+		CreatedAt: time.Date(2025, 1, 5, 12, 0, 0, 0, time.UTC),
+	})
+
+	require.Equal(t, int64(303), prepared.args[2])
+	require.Equal(t, sql.NullString{String: upstreamModel, Valid: true}, prepared.args[6])
+	require.Equal(t, service.RouteModeStandby, prepared.args[49])
+	require.Equal(t, sql.NullString{String: mappingRule, Valid: true}, prepared.args[50])
+	require.Equal(t, 3, prepared.args[51])
+	failuresJSON, ok := prepared.args[52].(string)
+	require.True(t, ok)
+	require.JSONEq(t, `[
+		{"account_id":101,"standby":false,"status_code":502,"kind":"upstream_5xx"},
+		{"account_id":202,"standby":true,"status_code":429,"kind":"rate_limited"}
+	]`, failuresJSON)
+	require.NotContains(t, failuresJSON, "secret")
 }
 
 func TestPrepareUsageLogInsert_PersistsImageSizeMetadata(t *testing.T) {
@@ -597,6 +640,67 @@ func (s usageLogScannerStub) Scan(dest ...any) error {
 	return nil
 }
 
+func routeAuditUsageLogScanValues(now time.Time) []any {
+	return []any{
+		int64(1), int64(10), int64(20), int64(30),
+		sql.NullString{Valid: true, String: "req-route"},
+		"gpt-5.1",
+		sql.NullString{Valid: true, String: "gpt-5.1"},
+		sql.NullString{}, sql.NullInt64{}, sql.NullInt64{},
+		1, 2, 3, 4, 5, 6,
+		0, 0.0,
+		0.1, 0.2, 0.3, 0.4, 1.0, 0.9,
+		1.0, sql.NullFloat64{},
+		int16(service.BillingTypeBalance), int16(service.RequestTypeSync),
+		false, false,
+		sql.NullInt64{}, sql.NullInt64{}, sql.NullString{}, sql.NullString{},
+		0, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{},
+		sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{},
+		false, sql.NullInt64{}, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullFloat64{},
+		sql.NullString{}, sql.NullString{}, sql.NullInt64{}, sql.NullString{},
+		now,
+	}
+}
+
+func TestScanUsageLog_RouteAuditRoundTripAndHistoricalNormalization(t *testing.T) {
+	t.Run("standby route", func(t *testing.T) {
+		values := routeAuditUsageLogScanValues(time.Now().UTC())
+		values[3] = int64(303)
+		values[7] = sql.NullString{Valid: true, String: "gpt-5.4"}
+		values[50] = sql.NullString{Valid: true, String: service.RouteModeStandby}
+		values[51] = sql.NullString{Valid: true, String: "gpt-5.1 -> gpt-5.4"}
+		values[52] = sql.NullInt64{Valid: true, Int64: 3}
+		values[53] = sql.NullString{Valid: true, String: `[{"account_id":101,"standby":false,"status_code":502,"kind":"upstream_5xx"}]`}
+
+		log, err := scanUsageLog(usageLogScannerStub{values: values})
+		require.NoError(t, err)
+		require.Equal(t, int64(303), log.AccountID)
+		require.NotNil(t, log.UpstreamModel)
+		require.Equal(t, "gpt-5.4", *log.UpstreamModel)
+		require.Equal(t, service.RouteModeStandby, log.RouteMode)
+		require.NotNil(t, log.RouteMappingRule)
+		require.Equal(t, "gpt-5.1 -> gpt-5.4", *log.RouteMappingRule)
+		require.Equal(t, 3, log.RouteAttemptCount)
+		require.Equal(t, []service.RouteFailureEntry{{AccountID: 101, StatusCode: 502, Kind: "upstream_5xx"}}, log.RouteFailures)
+	})
+
+	t.Run("historical empty values", func(t *testing.T) {
+		values := routeAuditUsageLogScanValues(time.Now().UTC())
+		values[50] = sql.NullString{Valid: true, String: ""}
+		values[51] = sql.NullString{Valid: true, String: "should be removed"}
+		values[52] = sql.NullInt64{Valid: true, Int64: 0}
+		values[53] = sql.NullString{Valid: true, String: "null"}
+
+		log, err := scanUsageLog(usageLogScannerStub{values: values})
+		require.NoError(t, err)
+		require.Equal(t, service.RouteModePrimary, log.RouteMode)
+		require.Nil(t, log.RouteMappingRule)
+		require.Equal(t, 1, log.RouteAttemptCount)
+		require.NotNil(t, log.RouteFailures)
+		require.Empty(t, log.RouteFailures)
+	})
+}
+
 func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 	t.Run("image_size_metadata_is_scanned", func(t *testing.T) {
 		now := time.Now().UTC()
@@ -640,6 +744,10 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},
 			sql.NullString{},
 			sql.NullFloat64{},
+			sql.NullString{Valid: true, String: service.RouteModePrimary},
+			sql.NullString{},
+			sql.NullInt64{Valid: true, Int64: 1},
+			sql.NullString{Valid: true, String: "[]"},
 			now,
 		}})
 		require.NoError(t, err)
@@ -708,6 +816,10 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // billing_tier
 			sql.NullString{},  // billing_mode
 			sql.NullFloat64{}, // account_stats_cost
+			sql.NullString{Valid: true, String: service.RouteModePrimary},
+			sql.NullString{},
+			sql.NullInt64{Valid: true, Int64: 1},
+			sql.NullString{Valid: true, String: "[]"},
 			now,
 		}})
 		require.NoError(t, err)
@@ -760,6 +872,10 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // billing_tier
 			sql.NullString{},  // billing_mode
 			sql.NullFloat64{}, // account_stats_cost
+			sql.NullString{Valid: true, String: service.RouteModePrimary},
+			sql.NullString{},
+			sql.NullInt64{Valid: true, Int64: 1},
+			sql.NullString{Valid: true, String: "[]"},
 			now,
 		}})
 		require.NoError(t, err)
@@ -812,6 +928,10 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},  // billing_tier
 			sql.NullString{},  // billing_mode
 			sql.NullFloat64{}, // account_stats_cost
+			sql.NullString{Valid: true, String: service.RouteModePrimary},
+			sql.NullString{},
+			sql.NullInt64{Valid: true, Int64: 1},
+			sql.NullString{Valid: true, String: "[]"},
 			now,
 		}})
 		require.NoError(t, err)

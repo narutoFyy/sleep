@@ -4815,6 +4815,9 @@ type AccountGroupMutation struct {
 	typ            string
 	priority       *int
 	addpriority    *int
+	role           *accountgroup.Role
+	enabled        *bool
+	model_mapping  *map[string]string
 	created_at     *time.Time
 	clearedFields  map[string]struct{}
 	account        *int64
@@ -4941,6 +4944,63 @@ func (m *AccountGroupMutation) ResetPriority() {
 	m.addpriority = nil
 }
 
+// SetRole sets the "role" field.
+func (m *AccountGroupMutation) SetRole(a accountgroup.Role) {
+	m.role = &a
+}
+
+// Role returns the value of the "role" field in the mutation.
+func (m *AccountGroupMutation) Role() (r accountgroup.Role, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRole resets all changes to the "role" field.
+func (m *AccountGroupMutation) ResetRole() {
+	m.role = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *AccountGroupMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *AccountGroupMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *AccountGroupMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (m *AccountGroupMutation) SetModelMapping(value map[string]string) {
+	m.model_mapping = &value
+}
+
+// ModelMapping returns the value of the "model_mapping" field in the mutation.
+func (m *AccountGroupMutation) ModelMapping() (r map[string]string, exists bool) {
+	v := m.model_mapping
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetModelMapping resets all changes to the "model_mapping" field.
+func (m *AccountGroupMutation) ResetModelMapping() {
+	m.model_mapping = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *AccountGroupMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -5048,7 +5108,7 @@ func (m *AccountGroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountGroupMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 7)
 	if m.account != nil {
 		fields = append(fields, accountgroup.FieldAccountID)
 	}
@@ -5057,6 +5117,15 @@ func (m *AccountGroupMutation) Fields() []string {
 	}
 	if m.priority != nil {
 		fields = append(fields, accountgroup.FieldPriority)
+	}
+	if m.role != nil {
+		fields = append(fields, accountgroup.FieldRole)
+	}
+	if m.enabled != nil {
+		fields = append(fields, accountgroup.FieldEnabled)
+	}
+	if m.model_mapping != nil {
+		fields = append(fields, accountgroup.FieldModelMapping)
 	}
 	if m.created_at != nil {
 		fields = append(fields, accountgroup.FieldCreatedAt)
@@ -5075,6 +5144,12 @@ func (m *AccountGroupMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupID()
 	case accountgroup.FieldPriority:
 		return m.Priority()
+	case accountgroup.FieldRole:
+		return m.Role()
+	case accountgroup.FieldEnabled:
+		return m.Enabled()
+	case accountgroup.FieldModelMapping:
+		return m.ModelMapping()
 	case accountgroup.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -5113,6 +5188,27 @@ func (m *AccountGroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPriority(v)
+		return nil
+	case accountgroup.FieldRole:
+		v, ok := value.(accountgroup.Role)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRole(v)
+		return nil
+	case accountgroup.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case accountgroup.FieldModelMapping:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelMapping(v)
 		return nil
 	case accountgroup.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -5193,6 +5289,15 @@ func (m *AccountGroupMutation) ResetField(name string) error {
 		return nil
 	case accountgroup.FieldPriority:
 		m.ResetPriority()
+		return nil
+	case accountgroup.FieldRole:
+		m.ResetRole()
+		return nil
+	case accountgroup.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case accountgroup.FieldModelMapping:
+		m.ResetModelMapping()
 		return nil
 	case accountgroup.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -34892,6 +34997,12 @@ type UsageLogMutation struct {
 	model                       *string
 	requested_model             *string
 	upstream_model              *string
+	route_mode                  *string
+	route_mapping_rule          *string
+	route_attempt_count         *int
+	addroute_attempt_count      *int
+	route_failures              *[]map[string]interface{}
+	appendroute_failures        []map[string]interface{}
 	channel_id                  *int64
 	addchannel_id               *int64
 	model_mapping_chain         *string
@@ -35333,6 +35444,198 @@ func (m *UsageLogMutation) UpstreamModelCleared() bool {
 func (m *UsageLogMutation) ResetUpstreamModel() {
 	m.upstream_model = nil
 	delete(m.clearedFields, usagelog.FieldUpstreamModel)
+}
+
+// SetRouteMode sets the "route_mode" field.
+func (m *UsageLogMutation) SetRouteMode(s string) {
+	m.route_mode = &s
+}
+
+// RouteMode returns the value of the "route_mode" field in the mutation.
+func (m *UsageLogMutation) RouteMode() (r string, exists bool) {
+	v := m.route_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRouteMode returns the old "route_mode" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldRouteMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRouteMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRouteMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRouteMode: %w", err)
+	}
+	return oldValue.RouteMode, nil
+}
+
+// ResetRouteMode resets all changes to the "route_mode" field.
+func (m *UsageLogMutation) ResetRouteMode() {
+	m.route_mode = nil
+}
+
+// SetRouteMappingRule sets the "route_mapping_rule" field.
+func (m *UsageLogMutation) SetRouteMappingRule(s string) {
+	m.route_mapping_rule = &s
+}
+
+// RouteMappingRule returns the value of the "route_mapping_rule" field in the mutation.
+func (m *UsageLogMutation) RouteMappingRule() (r string, exists bool) {
+	v := m.route_mapping_rule
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRouteMappingRule returns the old "route_mapping_rule" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldRouteMappingRule(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRouteMappingRule is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRouteMappingRule requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRouteMappingRule: %w", err)
+	}
+	return oldValue.RouteMappingRule, nil
+}
+
+// ClearRouteMappingRule clears the value of the "route_mapping_rule" field.
+func (m *UsageLogMutation) ClearRouteMappingRule() {
+	m.route_mapping_rule = nil
+	m.clearedFields[usagelog.FieldRouteMappingRule] = struct{}{}
+}
+
+// RouteMappingRuleCleared returns if the "route_mapping_rule" field was cleared in this mutation.
+func (m *UsageLogMutation) RouteMappingRuleCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldRouteMappingRule]
+	return ok
+}
+
+// ResetRouteMappingRule resets all changes to the "route_mapping_rule" field.
+func (m *UsageLogMutation) ResetRouteMappingRule() {
+	m.route_mapping_rule = nil
+	delete(m.clearedFields, usagelog.FieldRouteMappingRule)
+}
+
+// SetRouteAttemptCount sets the "route_attempt_count" field.
+func (m *UsageLogMutation) SetRouteAttemptCount(i int) {
+	m.route_attempt_count = &i
+	m.addroute_attempt_count = nil
+}
+
+// RouteAttemptCount returns the value of the "route_attempt_count" field in the mutation.
+func (m *UsageLogMutation) RouteAttemptCount() (r int, exists bool) {
+	v := m.route_attempt_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRouteAttemptCount returns the old "route_attempt_count" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldRouteAttemptCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRouteAttemptCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRouteAttemptCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRouteAttemptCount: %w", err)
+	}
+	return oldValue.RouteAttemptCount, nil
+}
+
+// AddRouteAttemptCount adds i to the "route_attempt_count" field.
+func (m *UsageLogMutation) AddRouteAttemptCount(i int) {
+	if m.addroute_attempt_count != nil {
+		*m.addroute_attempt_count += i
+	} else {
+		m.addroute_attempt_count = &i
+	}
+}
+
+// AddedRouteAttemptCount returns the value that was added to the "route_attempt_count" field in this mutation.
+func (m *UsageLogMutation) AddedRouteAttemptCount() (r int, exists bool) {
+	v := m.addroute_attempt_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRouteAttemptCount resets all changes to the "route_attempt_count" field.
+func (m *UsageLogMutation) ResetRouteAttemptCount() {
+	m.route_attempt_count = nil
+	m.addroute_attempt_count = nil
+}
+
+// SetRouteFailures sets the "route_failures" field.
+func (m *UsageLogMutation) SetRouteFailures(value []map[string]interface{}) {
+	m.route_failures = &value
+	m.appendroute_failures = nil
+}
+
+// RouteFailures returns the value of the "route_failures" field in the mutation.
+func (m *UsageLogMutation) RouteFailures() (r []map[string]interface{}, exists bool) {
+	v := m.route_failures
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRouteFailures returns the old "route_failures" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldRouteFailures(ctx context.Context) (v []map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRouteFailures is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRouteFailures requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRouteFailures: %w", err)
+	}
+	return oldValue.RouteFailures, nil
+}
+
+// AppendRouteFailures adds value to the "route_failures" field.
+func (m *UsageLogMutation) AppendRouteFailures(value []map[string]interface{}) {
+	m.appendroute_failures = append(m.appendroute_failures, value...)
+}
+
+// AppendedRouteFailures returns the list of values that were appended to the "route_failures" field in this mutation.
+func (m *UsageLogMutation) AppendedRouteFailures() ([]map[string]interface{}, bool) {
+	if len(m.appendroute_failures) == 0 {
+		return nil, false
+	}
+	return m.appendroute_failures, true
+}
+
+// ResetRouteFailures resets all changes to the "route_failures" field.
+func (m *UsageLogMutation) ResetRouteFailures() {
+	m.route_failures = nil
+	m.appendroute_failures = nil
 }
 
 // SetChannelID sets the "channel_id" field.
@@ -37320,7 +37623,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 41)
+	fields := make([]string, 0, 45)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -37341,6 +37644,18 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.upstream_model != nil {
 		fields = append(fields, usagelog.FieldUpstreamModel)
+	}
+	if m.route_mode != nil {
+		fields = append(fields, usagelog.FieldRouteMode)
+	}
+	if m.route_mapping_rule != nil {
+		fields = append(fields, usagelog.FieldRouteMappingRule)
+	}
+	if m.route_attempt_count != nil {
+		fields = append(fields, usagelog.FieldRouteAttemptCount)
+	}
+	if m.route_failures != nil {
+		fields = append(fields, usagelog.FieldRouteFailures)
 	}
 	if m.channel_id != nil {
 		fields = append(fields, usagelog.FieldChannelID)
@@ -37466,6 +37781,14 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.RequestedModel()
 	case usagelog.FieldUpstreamModel:
 		return m.UpstreamModel()
+	case usagelog.FieldRouteMode:
+		return m.RouteMode()
+	case usagelog.FieldRouteMappingRule:
+		return m.RouteMappingRule()
+	case usagelog.FieldRouteAttemptCount:
+		return m.RouteAttemptCount()
+	case usagelog.FieldRouteFailures:
+		return m.RouteFailures()
 	case usagelog.FieldChannelID:
 		return m.ChannelID()
 	case usagelog.FieldModelMappingChain:
@@ -37557,6 +37880,14 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldRequestedModel(ctx)
 	case usagelog.FieldUpstreamModel:
 		return m.OldUpstreamModel(ctx)
+	case usagelog.FieldRouteMode:
+		return m.OldRouteMode(ctx)
+	case usagelog.FieldRouteMappingRule:
+		return m.OldRouteMappingRule(ctx)
+	case usagelog.FieldRouteAttemptCount:
+		return m.OldRouteAttemptCount(ctx)
+	case usagelog.FieldRouteFailures:
+		return m.OldRouteFailures(ctx)
 	case usagelog.FieldChannelID:
 		return m.OldChannelID(ctx)
 	case usagelog.FieldModelMappingChain:
@@ -37682,6 +38013,34 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpstreamModel(v)
+		return nil
+	case usagelog.FieldRouteMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRouteMode(v)
+		return nil
+	case usagelog.FieldRouteMappingRule:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRouteMappingRule(v)
+		return nil
+	case usagelog.FieldRouteAttemptCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRouteAttemptCount(v)
+		return nil
+	case usagelog.FieldRouteFailures:
+		v, ok := value.([]map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRouteFailures(v)
 		return nil
 	case usagelog.FieldChannelID:
 		v, ok := value.(int64)
@@ -37929,6 +38288,9 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *UsageLogMutation) AddedFields() []string {
 	var fields []string
+	if m.addroute_attempt_count != nil {
+		fields = append(fields, usagelog.FieldRouteAttemptCount)
+	}
 	if m.addchannel_id != nil {
 		fields = append(fields, usagelog.FieldChannelID)
 	}
@@ -37994,6 +38356,8 @@ func (m *UsageLogMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case usagelog.FieldRouteAttemptCount:
+		return m.AddedRouteAttemptCount()
 	case usagelog.FieldChannelID:
 		return m.AddedChannelID()
 	case usagelog.FieldInputTokens:
@@ -38041,6 +38405,13 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case usagelog.FieldRouteAttemptCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRouteAttemptCount(v)
+		return nil
 	case usagelog.FieldChannelID:
 		v, ok := value.(int64)
 		if !ok {
@@ -38188,6 +38559,9 @@ func (m *UsageLogMutation) ClearedFields() []string {
 	if m.FieldCleared(usagelog.FieldUpstreamModel) {
 		fields = append(fields, usagelog.FieldUpstreamModel)
 	}
+	if m.FieldCleared(usagelog.FieldRouteMappingRule) {
+		fields = append(fields, usagelog.FieldRouteMappingRule)
+	}
 	if m.FieldCleared(usagelog.FieldChannelID) {
 		fields = append(fields, usagelog.FieldChannelID)
 	}
@@ -38255,6 +38629,9 @@ func (m *UsageLogMutation) ClearField(name string) error {
 		return nil
 	case usagelog.FieldUpstreamModel:
 		m.ClearUpstreamModel()
+		return nil
+	case usagelog.FieldRouteMappingRule:
+		m.ClearRouteMappingRule()
 		return nil
 	case usagelog.FieldChannelID:
 		m.ClearChannelID()
@@ -38332,6 +38709,18 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldUpstreamModel:
 		m.ResetUpstreamModel()
+		return nil
+	case usagelog.FieldRouteMode:
+		m.ResetRouteMode()
+		return nil
+	case usagelog.FieldRouteMappingRule:
+		m.ResetRouteMappingRule()
+		return nil
+	case usagelog.FieldRouteAttemptCount:
+		m.ResetRouteAttemptCount()
+		return nil
+	case usagelog.FieldRouteFailures:
+		m.ResetRouteFailures()
 		return nil
 	case usagelog.FieldChannelID:
 		m.ResetChannelID()

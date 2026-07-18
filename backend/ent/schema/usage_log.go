@@ -53,6 +53,18 @@ func (UsageLog) Fields() []ent.Field {
 			MaxLen(100).
 			Optional().
 			Nillable(),
+		field.String("route_mode").
+			MaxLen(16).
+			Default("primary"),
+		field.String("route_mapping_rule").
+			MaxLen(300).
+			Optional().
+			Nillable(),
+		field.Int("route_attempt_count").
+			Default(1),
+		field.JSON("route_failures", []map[string]any{}).
+			Default([]map[string]any{}).
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
 		field.Int64("channel_id").Optional().Nillable().Comment("渠道 ID"),
 		field.String("model_mapping_chain").MaxLen(500).Optional().Nillable().Comment("模型映射链"),
 		field.String("billing_tier").MaxLen(50).Optional().Nillable().Comment("计费层级标签"),

@@ -67,24 +67,25 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	startTime := time.Now()
 
 	// 1. Parse minimal fields needed for routing/billing
-	originalModel := gjson.GetBytes(body, "model").String()
-	if originalModel == "" {
+	routingModel := gjson.GetBytes(body, "model").String()
+	if routingModel == "" {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", "model is required")
 		return nil, fmt.Errorf("missing model in request")
 	}
+	originalModel := clientModelFromContext(ctx, routingModel)
 	clientStream := gjson.GetBytes(body, "stream").Bool()
 
 	// 1b. Extract reasoning effort and service tier from the raw body before any transformation.
-	reasoningEffort := extractOpenAIReasoningEffortFromBody(body, originalModel)
+	reasoningEffort := extractOpenAIReasoningEffortFromBody(body, routingModel)
 	serviceTier := extractOpenAIServiceTierFromBody(body)
 
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
-	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
+	billingModel := resolveOpenAIForwardModel(account, routingModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
 
 	// 3. Rewrite model in body (no protocol conversion)
 	upstreamBody := body
-	if upstreamModel != originalModel {
+	if upstreamModel != routingModel {
 		upstreamBody = ReplaceModelInBody(body, upstreamModel)
 	}
 

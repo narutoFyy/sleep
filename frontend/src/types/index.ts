@@ -692,6 +692,14 @@ export interface UpdateGroupRequest {
 
 export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account'
+
+export interface AccountGroupMembership {
+  group_id: number
+  role?: 'primary' | 'standby' | ''
+  enabled?: boolean
+  priority?: number
+  model_mapping?: Record<string, string>
+}
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'
 
@@ -851,6 +859,7 @@ export interface Account {
   updated_at: string
   proxy?: Proxy
   group_ids?: number[] // Groups this account belongs to
+  account_groups?: AccountGroupMembership[] // Structured per-group routing membership
   groups?: Group[] // Preloaded group objects
 
   // Rate limit & scheduling fields
@@ -1034,6 +1043,7 @@ export interface CreateAccountRequest {
   priority?: number
   rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
   group_ids?: number[]
+  account_groups?: AccountGroupMembership[]
   expires_at?: number | null
   auto_pause_on_expired?: boolean
   confirm_mixed_channel_risk?: boolean
@@ -1053,6 +1063,7 @@ export interface UpdateAccountRequest {
   schedulable?: boolean
   status?: 'active' | 'inactive' | 'error'
   group_ids?: number[]
+  account_groups?: AccountGroupMembership[]
   expires_at?: number | null
   auto_pause_on_expired?: boolean
   confirm_mixed_channel_risk?: boolean

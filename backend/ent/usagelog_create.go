@@ -85,6 +85,54 @@ func (_c *UsageLogCreate) SetNillableUpstreamModel(v *string) *UsageLogCreate {
 	return _c
 }
 
+// SetRouteMode sets the "route_mode" field.
+func (_c *UsageLogCreate) SetRouteMode(v string) *UsageLogCreate {
+	_c.mutation.SetRouteMode(v)
+	return _c
+}
+
+// SetNillableRouteMode sets the "route_mode" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableRouteMode(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetRouteMode(*v)
+	}
+	return _c
+}
+
+// SetRouteMappingRule sets the "route_mapping_rule" field.
+func (_c *UsageLogCreate) SetRouteMappingRule(v string) *UsageLogCreate {
+	_c.mutation.SetRouteMappingRule(v)
+	return _c
+}
+
+// SetNillableRouteMappingRule sets the "route_mapping_rule" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableRouteMappingRule(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetRouteMappingRule(*v)
+	}
+	return _c
+}
+
+// SetRouteAttemptCount sets the "route_attempt_count" field.
+func (_c *UsageLogCreate) SetRouteAttemptCount(v int) *UsageLogCreate {
+	_c.mutation.SetRouteAttemptCount(v)
+	return _c
+}
+
+// SetNillableRouteAttemptCount sets the "route_attempt_count" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableRouteAttemptCount(v *int) *UsageLogCreate {
+	if v != nil {
+		_c.SetRouteAttemptCount(*v)
+	}
+	return _c
+}
+
+// SetRouteFailures sets the "route_failures" field.
+func (_c *UsageLogCreate) SetRouteFailures(v []map[string]interface{}) *UsageLogCreate {
+	_c.mutation.SetRouteFailures(v)
+	return _c
+}
+
 // SetChannelID sets the "channel_id" field.
 func (_c *UsageLogCreate) SetChannelID(v int64) *UsageLogCreate {
 	_c.mutation.SetChannelID(v)
@@ -613,6 +661,18 @@ func (_c *UsageLogCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *UsageLogCreate) defaults() {
+	if _, ok := _c.mutation.RouteMode(); !ok {
+		v := usagelog.DefaultRouteMode
+		_c.mutation.SetRouteMode(v)
+	}
+	if _, ok := _c.mutation.RouteAttemptCount(); !ok {
+		v := usagelog.DefaultRouteAttemptCount
+		_c.mutation.SetRouteAttemptCount(v)
+	}
+	if _, ok := _c.mutation.RouteFailures(); !ok {
+		v := usagelog.DefaultRouteFailures
+		_c.mutation.SetRouteFailures(v)
+	}
 	if _, ok := _c.mutation.InputTokens(); !ok {
 		v := usagelog.DefaultInputTokens
 		_c.mutation.SetInputTokens(v)
@@ -723,6 +783,25 @@ func (_c *UsageLogCreate) check() error {
 		if err := usagelog.UpstreamModelValidator(v); err != nil {
 			return &ValidationError{Name: "upstream_model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.upstream_model": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.RouteMode(); !ok {
+		return &ValidationError{Name: "route_mode", err: errors.New(`ent: missing required field "UsageLog.route_mode"`)}
+	}
+	if v, ok := _c.mutation.RouteMode(); ok {
+		if err := usagelog.RouteModeValidator(v); err != nil {
+			return &ValidationError{Name: "route_mode", err: fmt.Errorf(`ent: validator failed for field "UsageLog.route_mode": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.RouteMappingRule(); ok {
+		if err := usagelog.RouteMappingRuleValidator(v); err != nil {
+			return &ValidationError{Name: "route_mapping_rule", err: fmt.Errorf(`ent: validator failed for field "UsageLog.route_mapping_rule": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.RouteAttemptCount(); !ok {
+		return &ValidationError{Name: "route_attempt_count", err: errors.New(`ent: missing required field "UsageLog.route_attempt_count"`)}
+	}
+	if _, ok := _c.mutation.RouteFailures(); !ok {
+		return &ValidationError{Name: "route_failures", err: errors.New(`ent: missing required field "UsageLog.route_failures"`)}
 	}
 	if v, ok := _c.mutation.ModelMappingChain(); ok {
 		if err := usagelog.ModelMappingChainValidator(v); err != nil {
@@ -874,6 +953,22 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpstreamModel(); ok {
 		_spec.SetField(usagelog.FieldUpstreamModel, field.TypeString, value)
 		_node.UpstreamModel = &value
+	}
+	if value, ok := _c.mutation.RouteMode(); ok {
+		_spec.SetField(usagelog.FieldRouteMode, field.TypeString, value)
+		_node.RouteMode = value
+	}
+	if value, ok := _c.mutation.RouteMappingRule(); ok {
+		_spec.SetField(usagelog.FieldRouteMappingRule, field.TypeString, value)
+		_node.RouteMappingRule = &value
+	}
+	if value, ok := _c.mutation.RouteAttemptCount(); ok {
+		_spec.SetField(usagelog.FieldRouteAttemptCount, field.TypeInt, value)
+		_node.RouteAttemptCount = value
+	}
+	if value, ok := _c.mutation.RouteFailures(); ok {
+		_spec.SetField(usagelog.FieldRouteFailures, field.TypeJSON, value)
+		_node.RouteFailures = value
 	}
 	if value, ok := _c.mutation.ChannelID(); ok {
 		_spec.SetField(usagelog.FieldChannelID, field.TypeInt64, value)
@@ -1233,6 +1328,66 @@ func (u *UsageLogUpsert) UpdateUpstreamModel() *UsageLogUpsert {
 // ClearUpstreamModel clears the value of the "upstream_model" field.
 func (u *UsageLogUpsert) ClearUpstreamModel() *UsageLogUpsert {
 	u.SetNull(usagelog.FieldUpstreamModel)
+	return u
+}
+
+// SetRouteMode sets the "route_mode" field.
+func (u *UsageLogUpsert) SetRouteMode(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldRouteMode, v)
+	return u
+}
+
+// UpdateRouteMode sets the "route_mode" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateRouteMode() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldRouteMode)
+	return u
+}
+
+// SetRouteMappingRule sets the "route_mapping_rule" field.
+func (u *UsageLogUpsert) SetRouteMappingRule(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldRouteMappingRule, v)
+	return u
+}
+
+// UpdateRouteMappingRule sets the "route_mapping_rule" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateRouteMappingRule() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldRouteMappingRule)
+	return u
+}
+
+// ClearRouteMappingRule clears the value of the "route_mapping_rule" field.
+func (u *UsageLogUpsert) ClearRouteMappingRule() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldRouteMappingRule)
+	return u
+}
+
+// SetRouteAttemptCount sets the "route_attempt_count" field.
+func (u *UsageLogUpsert) SetRouteAttemptCount(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldRouteAttemptCount, v)
+	return u
+}
+
+// UpdateRouteAttemptCount sets the "route_attempt_count" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateRouteAttemptCount() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldRouteAttemptCount)
+	return u
+}
+
+// AddRouteAttemptCount adds v to the "route_attempt_count" field.
+func (u *UsageLogUpsert) AddRouteAttemptCount(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldRouteAttemptCount, v)
+	return u
+}
+
+// SetRouteFailures sets the "route_failures" field.
+func (u *UsageLogUpsert) SetRouteFailures(v []map[string]interface{}) *UsageLogUpsert {
+	u.Set(usagelog.FieldRouteFailures, v)
+	return u
+}
+
+// UpdateRouteFailures sets the "route_failures" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateRouteFailures() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldRouteFailures)
 	return u
 }
 
@@ -1996,6 +2151,76 @@ func (u *UsageLogUpsertOne) UpdateUpstreamModel() *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) ClearUpstreamModel() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearUpstreamModel()
+	})
+}
+
+// SetRouteMode sets the "route_mode" field.
+func (u *UsageLogUpsertOne) SetRouteMode(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRouteMode(v)
+	})
+}
+
+// UpdateRouteMode sets the "route_mode" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateRouteMode() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRouteMode()
+	})
+}
+
+// SetRouteMappingRule sets the "route_mapping_rule" field.
+func (u *UsageLogUpsertOne) SetRouteMappingRule(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRouteMappingRule(v)
+	})
+}
+
+// UpdateRouteMappingRule sets the "route_mapping_rule" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateRouteMappingRule() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRouteMappingRule()
+	})
+}
+
+// ClearRouteMappingRule clears the value of the "route_mapping_rule" field.
+func (u *UsageLogUpsertOne) ClearRouteMappingRule() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearRouteMappingRule()
+	})
+}
+
+// SetRouteAttemptCount sets the "route_attempt_count" field.
+func (u *UsageLogUpsertOne) SetRouteAttemptCount(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRouteAttemptCount(v)
+	})
+}
+
+// AddRouteAttemptCount adds v to the "route_attempt_count" field.
+func (u *UsageLogUpsertOne) AddRouteAttemptCount(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddRouteAttemptCount(v)
+	})
+}
+
+// UpdateRouteAttemptCount sets the "route_attempt_count" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateRouteAttemptCount() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRouteAttemptCount()
+	})
+}
+
+// SetRouteFailures sets the "route_failures" field.
+func (u *UsageLogUpsertOne) SetRouteFailures(v []map[string]interface{}) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRouteFailures(v)
+	})
+}
+
+// UpdateRouteFailures sets the "route_failures" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateRouteFailures() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRouteFailures()
 	})
 }
 
@@ -3026,6 +3251,76 @@ func (u *UsageLogUpsertBulk) UpdateUpstreamModel() *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) ClearUpstreamModel() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearUpstreamModel()
+	})
+}
+
+// SetRouteMode sets the "route_mode" field.
+func (u *UsageLogUpsertBulk) SetRouteMode(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRouteMode(v)
+	})
+}
+
+// UpdateRouteMode sets the "route_mode" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateRouteMode() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRouteMode()
+	})
+}
+
+// SetRouteMappingRule sets the "route_mapping_rule" field.
+func (u *UsageLogUpsertBulk) SetRouteMappingRule(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRouteMappingRule(v)
+	})
+}
+
+// UpdateRouteMappingRule sets the "route_mapping_rule" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateRouteMappingRule() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRouteMappingRule()
+	})
+}
+
+// ClearRouteMappingRule clears the value of the "route_mapping_rule" field.
+func (u *UsageLogUpsertBulk) ClearRouteMappingRule() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearRouteMappingRule()
+	})
+}
+
+// SetRouteAttemptCount sets the "route_attempt_count" field.
+func (u *UsageLogUpsertBulk) SetRouteAttemptCount(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRouteAttemptCount(v)
+	})
+}
+
+// AddRouteAttemptCount adds v to the "route_attempt_count" field.
+func (u *UsageLogUpsertBulk) AddRouteAttemptCount(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddRouteAttemptCount(v)
+	})
+}
+
+// UpdateRouteAttemptCount sets the "route_attempt_count" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateRouteAttemptCount() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRouteAttemptCount()
+	})
+}
+
+// SetRouteFailures sets the "route_failures" field.
+func (u *UsageLogUpsertBulk) SetRouteFailures(v []map[string]interface{}) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRouteFailures(v)
+	})
+}
+
+// UpdateRouteFailures sets the "route_failures" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateRouteFailures() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRouteFailures()
 	})
 }
 

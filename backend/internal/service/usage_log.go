@@ -104,6 +104,11 @@ type UsageLog struct {
 	// UpstreamModel is the actual model sent to the upstream provider after mapping.
 	// Nil means no mapping was applied (requested model was used as-is).
 	UpstreamModel *string
+	// Route audit fields describe only sanitized routing metadata for the final usage row.
+	RouteMode         string
+	RouteMappingRule  *string
+	RouteAttemptCount int
+	RouteFailures     []RouteFailureEntry
 	// ChannelID 渠道 ID
 	ChannelID *int64
 	// ModelMappingChain 模型映射链，如 "a→b→c"

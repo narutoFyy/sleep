@@ -50,6 +50,40 @@ func (_c *AccountGroupCreate) SetNillablePriority(v *int) *AccountGroupCreate {
 	return _c
 }
 
+// SetRole sets the "role" field.
+func (_c *AccountGroupCreate) SetRole(v accountgroup.Role) *AccountGroupCreate {
+	_c.mutation.SetRole(v)
+	return _c
+}
+
+// SetNillableRole sets the "role" field if the given value is not nil.
+func (_c *AccountGroupCreate) SetNillableRole(v *accountgroup.Role) *AccountGroupCreate {
+	if v != nil {
+		_c.SetRole(*v)
+	}
+	return _c
+}
+
+// SetEnabled sets the "enabled" field.
+func (_c *AccountGroupCreate) SetEnabled(v bool) *AccountGroupCreate {
+	_c.mutation.SetEnabled(v)
+	return _c
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_c *AccountGroupCreate) SetNillableEnabled(v *bool) *AccountGroupCreate {
+	if v != nil {
+		_c.SetEnabled(*v)
+	}
+	return _c
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (_c *AccountGroupCreate) SetModelMapping(v map[string]string) *AccountGroupCreate {
+	_c.mutation.SetModelMapping(v)
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *AccountGroupCreate) SetCreatedAt(v time.Time) *AccountGroupCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -113,6 +147,18 @@ func (_c *AccountGroupCreate) defaults() {
 		v := accountgroup.DefaultPriority
 		_c.mutation.SetPriority(v)
 	}
+	if _, ok := _c.mutation.Role(); !ok {
+		v := accountgroup.DefaultRole
+		_c.mutation.SetRole(v)
+	}
+	if _, ok := _c.mutation.Enabled(); !ok {
+		v := accountgroup.DefaultEnabled
+		_c.mutation.SetEnabled(v)
+	}
+	if _, ok := _c.mutation.ModelMapping(); !ok {
+		v := accountgroup.DefaultModelMapping()
+		_c.mutation.SetModelMapping(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := accountgroup.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -129,6 +175,20 @@ func (_c *AccountGroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.Priority(); !ok {
 		return &ValidationError{Name: "priority", err: errors.New(`ent: missing required field "AccountGroup.priority"`)}
+	}
+	if _, ok := _c.mutation.Role(); !ok {
+		return &ValidationError{Name: "role", err: errors.New(`ent: missing required field "AccountGroup.role"`)}
+	}
+	if v, ok := _c.mutation.Role(); ok {
+		if err := accountgroup.RoleValidator(v); err != nil {
+			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.role": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Enabled(); !ok {
+		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "AccountGroup.enabled"`)}
+	}
+	if _, ok := _c.mutation.ModelMapping(); !ok {
+		return &ValidationError{Name: "model_mapping", err: errors.New(`ent: missing required field "AccountGroup.model_mapping"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "AccountGroup.created_at"`)}
@@ -165,6 +225,18 @@ func (_c *AccountGroupCreate) createSpec() (*AccountGroup, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.Priority(); ok {
 		_spec.SetField(accountgroup.FieldPriority, field.TypeInt, value)
 		_node.Priority = value
+	}
+	if value, ok := _c.mutation.Role(); ok {
+		_spec.SetField(accountgroup.FieldRole, field.TypeEnum, value)
+		_node.Role = value
+	}
+	if value, ok := _c.mutation.Enabled(); ok {
+		_spec.SetField(accountgroup.FieldEnabled, field.TypeBool, value)
+		_node.Enabled = value
+	}
+	if value, ok := _c.mutation.ModelMapping(); ok {
+		_spec.SetField(accountgroup.FieldModelMapping, field.TypeJSON, value)
+		_node.ModelMapping = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(accountgroup.FieldCreatedAt, field.TypeTime, value)
@@ -298,6 +370,42 @@ func (u *AccountGroupUpsert) AddPriority(v int) *AccountGroupUpsert {
 	return u
 }
 
+// SetRole sets the "role" field.
+func (u *AccountGroupUpsert) SetRole(v accountgroup.Role) *AccountGroupUpsert {
+	u.Set(accountgroup.FieldRole, v)
+	return u
+}
+
+// UpdateRole sets the "role" field to the value that was provided on create.
+func (u *AccountGroupUpsert) UpdateRole() *AccountGroupUpsert {
+	u.SetExcluded(accountgroup.FieldRole)
+	return u
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *AccountGroupUpsert) SetEnabled(v bool) *AccountGroupUpsert {
+	u.Set(accountgroup.FieldEnabled, v)
+	return u
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *AccountGroupUpsert) UpdateEnabled() *AccountGroupUpsert {
+	u.SetExcluded(accountgroup.FieldEnabled)
+	return u
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (u *AccountGroupUpsert) SetModelMapping(v map[string]string) *AccountGroupUpsert {
+	u.Set(accountgroup.FieldModelMapping, v)
+	return u
+}
+
+// UpdateModelMapping sets the "model_mapping" field to the value that was provided on create.
+func (u *AccountGroupUpsert) UpdateModelMapping() *AccountGroupUpsert {
+	u.SetExcluded(accountgroup.FieldModelMapping)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -389,6 +497,48 @@ func (u *AccountGroupUpsertOne) AddPriority(v int) *AccountGroupUpsertOne {
 func (u *AccountGroupUpsertOne) UpdatePriority() *AccountGroupUpsertOne {
 	return u.Update(func(s *AccountGroupUpsert) {
 		s.UpdatePriority()
+	})
+}
+
+// SetRole sets the "role" field.
+func (u *AccountGroupUpsertOne) SetRole(v accountgroup.Role) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetRole(v)
+	})
+}
+
+// UpdateRole sets the "role" field to the value that was provided on create.
+func (u *AccountGroupUpsertOne) UpdateRole() *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateRole()
+	})
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *AccountGroupUpsertOne) SetEnabled(v bool) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetEnabled(v)
+	})
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *AccountGroupUpsertOne) UpdateEnabled() *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateEnabled()
+	})
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (u *AccountGroupUpsertOne) SetModelMapping(v map[string]string) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetModelMapping(v)
+	})
+}
+
+// UpdateModelMapping sets the "model_mapping" field to the value that was provided on create.
+func (u *AccountGroupUpsertOne) UpdateModelMapping() *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateModelMapping()
 	})
 }
 
@@ -626,6 +776,48 @@ func (u *AccountGroupUpsertBulk) AddPriority(v int) *AccountGroupUpsertBulk {
 func (u *AccountGroupUpsertBulk) UpdatePriority() *AccountGroupUpsertBulk {
 	return u.Update(func(s *AccountGroupUpsert) {
 		s.UpdatePriority()
+	})
+}
+
+// SetRole sets the "role" field.
+func (u *AccountGroupUpsertBulk) SetRole(v accountgroup.Role) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetRole(v)
+	})
+}
+
+// UpdateRole sets the "role" field to the value that was provided on create.
+func (u *AccountGroupUpsertBulk) UpdateRole() *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateRole()
+	})
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *AccountGroupUpsertBulk) SetEnabled(v bool) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetEnabled(v)
+	})
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *AccountGroupUpsertBulk) UpdateEnabled() *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateEnabled()
+	})
+}
+
+// SetModelMapping sets the "model_mapping" field.
+func (u *AccountGroupUpsertBulk) SetModelMapping(v map[string]string) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetModelMapping(v)
+	})
+}
+
+// UpdateModelMapping sets the "model_mapping" field to the value that was provided on create.
+func (u *AccountGroupUpsertBulk) UpdateModelMapping() *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateModelMapping()
 	})
 }
 

@@ -28,6 +28,14 @@ const (
 	FieldRequestedModel = "requested_model"
 	// FieldUpstreamModel holds the string denoting the upstream_model field in the database.
 	FieldUpstreamModel = "upstream_model"
+	// FieldRouteMode holds the string denoting the route_mode field in the database.
+	FieldRouteMode = "route_mode"
+	// FieldRouteMappingRule holds the string denoting the route_mapping_rule field in the database.
+	FieldRouteMappingRule = "route_mapping_rule"
+	// FieldRouteAttemptCount holds the string denoting the route_attempt_count field in the database.
+	FieldRouteAttemptCount = "route_attempt_count"
+	// FieldRouteFailures holds the string denoting the route_failures field in the database.
+	FieldRouteFailures = "route_failures"
 	// FieldChannelID holds the string denoting the channel_id field in the database.
 	FieldChannelID = "channel_id"
 	// FieldModelMappingChain holds the string denoting the model_mapping_chain field in the database.
@@ -155,6 +163,10 @@ var Columns = []string{
 	FieldModel,
 	FieldRequestedModel,
 	FieldUpstreamModel,
+	FieldRouteMode,
+	FieldRouteMappingRule,
+	FieldRouteAttemptCount,
+	FieldRouteFailures,
 	FieldChannelID,
 	FieldModelMappingChain,
 	FieldBillingTier,
@@ -210,6 +222,16 @@ var (
 	RequestedModelValidator func(string) error
 	// UpstreamModelValidator is a validator for the "upstream_model" field. It is called by the builders before save.
 	UpstreamModelValidator func(string) error
+	// DefaultRouteMode holds the default value on creation for the "route_mode" field.
+	DefaultRouteMode string
+	// RouteModeValidator is a validator for the "route_mode" field. It is called by the builders before save.
+	RouteModeValidator func(string) error
+	// RouteMappingRuleValidator is a validator for the "route_mapping_rule" field. It is called by the builders before save.
+	RouteMappingRuleValidator func(string) error
+	// DefaultRouteAttemptCount holds the default value on creation for the "route_attempt_count" field.
+	DefaultRouteAttemptCount int
+	// DefaultRouteFailures holds the default value on creation for the "route_failures" field.
+	DefaultRouteFailures []map[string]interface{}
 	// ModelMappingChainValidator is a validator for the "model_mapping_chain" field. It is called by the builders before save.
 	ModelMappingChainValidator func(string) error
 	// BillingTierValidator is a validator for the "billing_tier" field. It is called by the builders before save.
@@ -307,6 +329,21 @@ func ByRequestedModel(opts ...sql.OrderTermOption) OrderOption {
 // ByUpstreamModel orders the results by the upstream_model field.
 func ByUpstreamModel(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpstreamModel, opts...).ToFunc()
+}
+
+// ByRouteMode orders the results by the route_mode field.
+func ByRouteMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRouteMode, opts...).ToFunc()
+}
+
+// ByRouteMappingRule orders the results by the route_mapping_rule field.
+func ByRouteMappingRule(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRouteMappingRule, opts...).ToFunc()
+}
+
+// ByRouteAttemptCount orders the results by the route_attempt_count field.
+func ByRouteAttemptCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRouteAttemptCount, opts...).ToFunc()
 }
 
 // ByChannelID orders the results by the channel_id field.

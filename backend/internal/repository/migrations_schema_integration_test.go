@@ -48,6 +48,13 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 	requireColumn(t, tx, "usage_logs", "image_output_size", "character varying", 32, true)
 	requireColumn(t, tx, "usage_logs", "image_size_source", "character varying", 16, true)
 	requireColumn(t, tx, "usage_logs", "image_size_breakdown", "jsonb", 0, true)
+	requireColumn(t, tx, "usage_logs", "route_mode", "character varying", 16, false)
+	requireColumn(t, tx, "usage_logs", "route_mapping_rule", "character varying", 300, true)
+	requireColumn(t, tx, "usage_logs", "route_attempt_count", "integer", 0, false)
+	requireColumn(t, tx, "usage_logs", "route_failures", "jsonb", 0, false)
+	requireConstraintDefinitionContains(t, tx, "usage_logs", "usage_logs_route_mode_check", "route_mode", "primary", "standby")
+	requireConstraintDefinitionContains(t, tx, "usage_logs", "usage_logs_route_attempt_count_check", "route_attempt_count", ">= 1")
+	requireConstraintDefinitionContains(t, tx, "usage_logs", "usage_logs_route_failures_array_check", "jsonb_typeof", "array")
 	requireConstraintDefinitionContains(
 		t,
 		tx,
@@ -111,6 +118,14 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 
 	// account_groups: created_at should be timestamptz
 	requireColumn(t, tx, "account_groups", "created_at", "timestamp with time zone", 0, false)
+	requireColumn(t, tx, "account_groups", "role", "character varying", 20, false)
+	requireColumn(t, tx, "account_groups", "enabled", "boolean", 0, false)
+	requireColumn(t, tx, "account_groups", "model_mapping", "jsonb", 0, false)
+	requireColumnDefaultContains(t, tx, "account_groups", "role", "primary")
+	requireColumnDefaultContains(t, tx, "account_groups", "enabled", "true")
+	requireColumnDefaultContains(t, tx, "account_groups", "model_mapping", "{}")
+	requireConstraintDefinitionContains(t, tx, "account_groups", "account_groups_role_check", "primary", "standby")
+	requireConstraintDefinitionContains(t, tx, "account_groups", "account_groups_model_mapping_object_check", "jsonb_typeof", "object")
 
 	// user_allowed_groups: created_at should be timestamptz
 	requireColumn(t, tx, "user_allowed_groups", "created_at", "timestamp with time zone", 0, false)

@@ -461,6 +461,47 @@ func (s *UsageLogRepoSuite) TestGetByID() {
 	s.Require().Equal(10, got.InputTokens)
 }
 
+func (s *UsageLogRepoSuite) TestCreateGetByID_RetainsActualStandbyRouteAudit() {
+	user := mustCreateUser(s.T(), s.client, &service.User{Email: "route-audit@test.com"})
+	apiKey := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user.ID, Key: "sk-route-audit", Name: "route"})
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "standby-route-account"})
+	upstreamModel := "gpt-5.4"
+	mappingRule := "gpt-5.1 -> gpt-5.4"
+	log := &service.UsageLog{
+		UserID:            user.ID,
+		APIKeyID:          apiKey.ID,
+		AccountID:         account.ID,
+		RequestID:         uuid.NewString(),
+		Model:             "gpt-5.1",
+		RequestedModel:    "gpt-5.1",
+		UpstreamModel:     &upstreamModel,
+		RouteMode:         service.RouteModeStandby,
+		RouteMappingRule:  &mappingRule,
+		RouteAttemptCount: 3,
+		RouteFailures: []service.RouteFailureEntry{
+			{AccountID: account.ID - 1, StatusCode: 502, Kind: "upstream_5xx"},
+			{AccountID: account.ID, Standby: true, StatusCode: 429, Kind: "rate_limited"},
+		},
+		CreatedAt: time.Now().UTC(),
+	}
+
+	inserted, err := s.repo.Create(s.ctx, log)
+	s.Require().NoError(err)
+	s.Require().True(inserted)
+	s.Require().NotZero(log.ID)
+
+	got, err := s.repo.GetByID(s.ctx, log.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(account.ID, got.AccountID)
+	s.Require().NotNil(got.UpstreamModel)
+	s.Require().Equal(upstreamModel, *got.UpstreamModel)
+	s.Require().Equal(service.RouteModeStandby, got.RouteMode)
+	s.Require().NotNil(got.RouteMappingRule)
+	s.Require().Equal(mappingRule, *got.RouteMappingRule)
+	s.Require().Equal(3, got.RouteAttemptCount)
+	s.Require().Equal(log.RouteFailures, got.RouteFailures)
+}
+
 func (s *UsageLogRepoSuite) TestGetByID_NotFound() {
 	_, err := s.repo.GetByID(s.ctx, 999999)
 	s.Require().Error(err, "expected error for non-existent ID")

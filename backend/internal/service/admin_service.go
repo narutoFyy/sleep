@@ -288,6 +288,7 @@ type CreateAccountInput struct {
 	RateMultiplier     *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor         *int
 	GroupIDs           []int64
+	AccountGroups      []AccountGroupInput
 	ExpiresAt          *int64
 	AutoPauseOnExpired *bool
 	// SkipDefaultGroupBind prevents auto-binding to platform default group when GroupIDs is empty.
@@ -310,6 +311,7 @@ type UpdateAccountInput struct {
 	LoadFactor            *int
 	Status                string
 	GroupIDs              *[]int64
+	AccountGroups         *[]AccountGroupInput
 	ExpiresAt             *int64
 	AutoPauseOnExpired    *bool
 	SkipMixedChannelCheck bool // 跳过混合渠道检查（用户已确认风险）
@@ -2570,10 +2572,21 @@ func (s *adminServiceImpl) GetAccountsByIDs(ctx context.Context, ids []int64) ([
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
-	// 绑定分组
+	if input.AccountGroups != nil && input.GroupIDs != nil {
+		return nil, infraerrors.BadRequest("ACCOUNT_GROUP_INPUT_CONFLICT", "account_groups and group_ids cannot be provided together")
+	}
+
+	structuredMemberships := input.AccountGroups != nil
+	memberships, err := NormalizeAccountGroupInputs(input.AccountGroups)
+	if err != nil {
+		return nil, err
+	}
 	groupIDs := input.GroupIDs
+	if structuredMemberships {
+		groupIDs = accountGroupIDs(memberships)
+	}
 	// 如果没有指定分组,自动绑定对应平台的默认分组
-	if len(groupIDs) == 0 && !input.SkipDefaultGroupBind {
+	if len(groupIDs) == 0 && !structuredMemberships && !input.SkipDefaultGroupBind {
 		defaultGroupName := input.Platform + "-default"
 		groups, err := s.groupRepo.ListActiveByPlatform(ctx, input.Platform)
 		if err == nil {
@@ -2640,8 +2653,18 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	}
 
 	// 绑定分组
-	if len(groupIDs) > 0 {
+	if structuredMemberships {
+		if err := s.bindAccountGroups(ctx, account.ID, memberships); err != nil {
+			return nil, err
+		}
+	} else if len(groupIDs) > 0 {
 		if err := s.accountRepo.BindGroups(ctx, account.ID, groupIDs); err != nil {
+			return nil, err
+		}
+	}
+	if structuredMemberships || len(groupIDs) > 0 {
+		account, err = s.accountRepo.GetByID(ctx, account.ID)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -2675,6 +2698,21 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 }
 
 func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error) {
+	if input.AccountGroups != nil && input.GroupIDs != nil {
+		return nil, infraerrors.BadRequest("ACCOUNT_GROUP_INPUT_CONFLICT", "account_groups and group_ids cannot be provided together")
+	}
+
+	var memberships []AccountGroup
+	var membershipGroupIDs []int64
+	if input.AccountGroups != nil {
+		var err error
+		memberships, err = NormalizeAccountGroupInputs(*input.AccountGroups)
+		if err != nil {
+			return nil, err
+		}
+		membershipGroupIDs = accountGroupIDs(memberships)
+	}
+
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -2771,14 +2809,18 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 
 	// 先验证分组是否存在（在任何写操作之前）
-	if input.GroupIDs != nil {
-		if err := s.validateGroupIDsExist(ctx, *input.GroupIDs); err != nil {
+	groupIDsToValidate := input.GroupIDs
+	if input.AccountGroups != nil {
+		groupIDsToValidate = &membershipGroupIDs
+	}
+	if groupIDsToValidate != nil {
+		if err := s.validateGroupIDsExist(ctx, *groupIDsToValidate); err != nil {
 			return nil, err
 		}
 
 		// 检查混合渠道风险（除非用户已确认）
 		if !input.SkipMixedChannelCheck {
-			if err := s.checkMixedChannelRisk(ctx, account.ID, account.Platform, *input.GroupIDs); err != nil {
+			if err := s.checkMixedChannelRisk(ctx, account.ID, account.Platform, *groupIDsToValidate); err != nil {
 				return nil, err
 			}
 		}
@@ -2789,7 +2831,11 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 
 	// 绑定分组
-	if input.GroupIDs != nil {
+	if input.AccountGroups != nil {
+		if err := s.bindAccountGroups(ctx, account.ID, memberships); err != nil {
+			return nil, err
+		}
+	} else if input.GroupIDs != nil {
 		if err := s.accountRepo.BindGroups(ctx, account.ID, *input.GroupIDs); err != nil {
 			return nil, err
 		}
@@ -3703,6 +3749,22 @@ func (s *adminServiceImpl) checkMixedChannelRisk(ctx context.Context, currentAcc
 	}
 
 	return nil
+}
+
+func accountGroupIDs(memberships []AccountGroup) []int64 {
+	groupIDs := make([]int64, 0, len(memberships))
+	for _, membership := range memberships {
+		groupIDs = append(groupIDs, membership.GroupID)
+	}
+	return groupIDs
+}
+
+func (s *adminServiceImpl) bindAccountGroups(ctx context.Context, accountID int64, memberships []AccountGroup) error {
+	binder, ok := s.accountRepo.(AccountGroupMembershipBinder)
+	if !ok {
+		return fmt.Errorf("account repository does not support extended group memberships")
+	}
+	return binder.BindAccountGroups(ctx, accountID, memberships)
 }
 
 func (s *adminServiceImpl) validateGroupIDsExist(ctx context.Context, groupIDs []int64) error {

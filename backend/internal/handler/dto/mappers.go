@@ -400,12 +400,15 @@ func AccountGroupFromService(ag *service.AccountGroup) *AccountGroup {
 		return nil
 	}
 	return &AccountGroup{
-		AccountID: ag.AccountID,
-		GroupID:   ag.GroupID,
-		Priority:  ag.Priority,
-		CreatedAt: ag.CreatedAt,
-		Account:   AccountFromServiceShallow(ag.Account),
-		Group:     GroupFromServiceShallow(ag.Group),
+		AccountID:    ag.AccountID,
+		GroupID:      ag.GroupID,
+		Priority:     ag.Priority,
+		Role:         string(ag.Role),
+		Enabled:      ag.Enabled,
+		ModelMapping: ag.ModelMapping,
+		CreatedAt:    ag.CreatedAt,
+		Account:      AccountFromServiceShallow(ag.Account),
+		Group:        GroupFromServiceShallow(ag.Group),
 	}
 }
 
@@ -580,6 +583,29 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 	if requestedModel == "" {
 		requestedModel = l.Model
 	}
+	routeMappingRule := ""
+	if l.RouteMappingRule != nil {
+		routeMappingRule = *l.RouteMappingRule
+	}
+	routeAudit := (&service.RouteAudit{
+		Mode:        l.RouteMode,
+		MappingRule: routeMappingRule,
+		Attempts:    l.RouteAttemptCount,
+		Failures:    l.RouteFailures,
+	}).Snapshot()
+	routeFailures := make([]RouteFailureEntry, len(routeAudit.Failures))
+	for i, failure := range routeAudit.Failures {
+		routeFailures[i] = RouteFailureEntry{
+			AccountID:  failure.AccountID,
+			Standby:    failure.Standby,
+			StatusCode: failure.StatusCode,
+			Kind:       failure.Kind,
+		}
+	}
+	var routeMappingRulePtr *string
+	if routeAudit.MappingRule != "" {
+		routeMappingRulePtr = &routeAudit.MappingRule
+	}
 	return UsageLog{
 		ID:                    l.ID,
 		UserID:                l.UserID,
@@ -587,6 +613,10 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		AccountID:             l.AccountID,
 		RequestID:             l.RequestID,
 		Model:                 requestedModel,
+		RouteMode:             routeAudit.Mode,
+		RouteMappingRule:      routeMappingRulePtr,
+		RouteAttemptCount:     routeAudit.Attempts,
+		RouteFailures:         routeFailures,
 		ServiceTier:           l.ServiceTier,
 		ReasoningEffort:       l.ReasoningEffort,
 		InboundEndpoint:       l.InboundEndpoint,

@@ -52,6 +52,7 @@ type GatewayHandler struct {
 	userMsgQueueHelper        *UserMsgQueueHelper
 	maxAccountSwitches        int
 	maxAccountSwitchesGemini  int
+	preContentRoutingDeadline time.Duration
 	cfg                       *config.Config
 	settingService            *service.SettingService
 }
@@ -107,6 +108,7 @@ func NewGatewayHandler(
 		userMsgQueueHelper:        umqHelper,
 		maxAccountSwitches:        maxAccountSwitches,
 		maxAccountSwitchesGemini:  maxAccountSwitchesGemini,
+		preContentRoutingDeadline: service.DefaultPreContentRoutingDeadline,
 		cfg:                       cfg,
 		settingService:            settingService,
 	}
@@ -289,6 +291,17 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	sessionKey := sessionHash
 	if platform == service.PlatformGemini && sessionHash != "" {
 		sessionKey = "gemini:" + sessionHash
+	}
+
+	var preContentTracker *service.PreContentTracker
+	if platform != service.PlatformGemini {
+		deadline := h.preContentRoutingDeadline
+		if deadline <= 0 {
+			deadline = service.DefaultPreContentRoutingDeadline
+		}
+		preContentTracker = service.NewPreContentTracker(c.Request.Context(), deadline)
+		c.Request = c.Request.WithContext(preContentTracker.Context())
+		defer preContentTracker.Close()
 	}
 
 	// 查询粘性会话绑定的账号 ID
@@ -566,6 +579,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		fallbackGroupID = apiKey.Group.FallbackGroupIDOnInvalidRequest
 	}
 	fallbackUsed := false
+	routeAudit := service.NewRouteAudit()
 
 	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
@@ -576,6 +590,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	for {
 		fs := NewFailoverState(h.maxAccountSwitches, hasBoundSession)
+		fs.MaxSwitches = int(^uint(0) >> 1)
+		standbyFS := NewFailoverState(fs.MaxSwitches, hasBoundSession)
+		primaryFailureObserved := false
 		retryWithFallback := false
 
 		for {
@@ -593,8 +610,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				zap.Int("failed_account_count", len(fs.FailedAccountIDs)),
 			)
 			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, subject.UserID)
+			if (err != nil || selection == nil || selection.Account == nil) && shouldAttemptStandby(err, primaryFailureObserved) {
+				selection, err = h.gatewayService.SelectStandbyAccount(c.Request.Context(), currentAPIKey.GroupID, reqModel, standbyFS.FailedAccountIDs)
+			}
 			if err != nil {
-				if len(fs.FailedAccountIDs) == 0 {
+				if h.handlePreContentRoutingDeadline(c, preContentTracker) {
+					return
+				}
+				if !primaryFailureObserved && standbyFS.LastFailoverErr == nil {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 					reqLog.Warn("gateway.select_account_no_available",
 						zap.String("model", reqModel),
@@ -606,22 +629,20 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
 					return
 				}
-				action := fs.HandleSelectionExhausted(c.Request.Context())
-				switch action {
-				case FailoverContinue:
-					ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
-					c.Request = c.Request.WithContext(ctx)
-					continue
-				case FailoverCanceled:
-					return
-				default: // FailoverExhausted
-					if fs.LastFailoverErr != nil {
-						h.handleFailoverExhausted(c, fs.LastFailoverErr, platform, streamStarted)
-					} else {
-						h.handleFailoverExhaustedSimple(c, 502, streamStarted)
-					}
-					return
+				responseStreamStarted := claudeResponseStreamStarted(c, streamStarted)
+				if standbyFS.LastFailoverErr != nil {
+					h.handleFailoverExhausted(c, standbyFS.LastFailoverErr, platform, responseStreamStarted)
+				} else if fs.LastFailoverErr != nil {
+					h.handleFailoverExhausted(c, fs.LastFailoverErr, platform, responseStreamStarted)
+				} else {
+					h.handleFailoverExhaustedSimple(c, 502, responseStreamStarted)
 				}
+				return
+			}
+			if selection == nil || selection.Account == nil {
+				markOpsRoutingCapacityLimited(c)
+				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts", streamStarted)
+				return
 			}
 			account := selection.Account
 			setOpsSelectedAccount(c, account.ID, account.Platform)
@@ -698,6 +719,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if err != nil {
 					reqLog.Warn("gateway.account_slot_acquire_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 					releaseWait()
+					if h.handlePreContentRoutingDeadline(c, preContentTracker) {
+						return
+					}
 					h.handleConcurrencyError(c, err, "account", streamStarted)
 					return
 				}
@@ -707,8 +731,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					zap.String("session_key", sessionKey),
 					zap.Int64("account_id", account.ID),
 				)
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
-					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+				if !selection.Standby {
+					if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
+						reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+					}
 				}
 			}
 			// 账号槽位/等待计数需要在超时或断开时安全回收
@@ -767,7 +793,13 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			// ===== 用户消息串行队列 END =====
 
 			// 渠道模型映射只作用于本次账号尝试，避免 failover 后污染原始 ParsedRequest。
-			if channelMapping.Mapped {
+			if selection.Standby {
+				attemptParsedReq.Model = selection.UpstreamModel
+				if err := attemptParsedReq.ReplaceBody(h.gatewayService.ReplaceModelInBody(attemptParsedReq.Body.Bytes(), selection.UpstreamModel)); err != nil {
+					h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
+					return
+				}
+			} else if channelMapping.Mapped {
 				attemptParsedReq.Model = channelMapping.MappedModel
 				if err := attemptParsedReq.ReplaceBody(h.gatewayService.ReplaceModelInBody(attemptParsedReq.Body.Bytes(), channelMapping.MappedModel)); err != nil {
 					h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
@@ -780,15 +812,28 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				return
 			}
 			attemptBody := attemptParsedReq.Body.Bytes()
+			if h.handlePreContentRoutingDeadline(c, preContentTracker) {
+				return
+			}
+			useEffectiveContent := preContentTracker != nil && account.Platform == service.PlatformAnthropic && !account.IsBedrock()
+			if preContentTracker != nil && !useEffectiveContent {
+				// Bedrock/Antigravity keep their existing stream semantics in T-003.
+				preContentTracker.MarkEffectiveContent()
+			}
 
 			// 转发请求 - 根据账号平台分流
 			c.Set("parsed_request", attemptParsedReq)
+			routeAudit.RecordAttempt()
 			var result *service.ForwardResult
 			requestCtx := c.Request.Context()
-			if fs.SwitchCount > 0 {
-				requestCtx = service.WithAccountSwitchCount(requestCtx, fs.SwitchCount, h.metadataBridgeEnabled())
+			totalSwitchCount := fs.SwitchCount + standbyFS.SwitchCount
+			if totalSwitchCount > 0 {
+				requestCtx = service.WithAccountSwitchCount(requestCtx, totalSwitchCount, h.metadataBridgeEnabled())
 			}
-			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
+			if selection.Standby {
+				requestCtx = service.WithStandbyClientModel(requestCtx, reqModel)
+			}
+			// 非 Anthropic 缓冲路径仍使用 writer size 作为兼容守卫。
 			writerSizeBeforeForward := c.Writer.Size()
 			if account.Platform == service.PlatformAntigravity && account.Type != service.AccountTypeAPIKey {
 				result, err = h.antigravityGatewayService.Forward(requestCtx, c, account, attemptBody, hasBoundSession)
@@ -807,6 +852,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				accountReleaseFunc()
 			}
 			if err != nil {
+				if h.handlePreContentRoutingDeadline(c, preContentTracker) {
+					return
+				}
 				// Beta policy block: return 400 immediately, no failover
 				var betaBlockedErr *service.BetaBlockedError
 				if errors.As(err, &betaBlockedErr) {
@@ -863,19 +911,31 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
-					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
-					if c.Writer.Size() != writerSizeBeforeForward {
+					routeAudit.RecordFailure(selection, failoverErr)
+					// 仅有效模型内容会提交 Anthropic 尝试；元数据和 ping 不阻止换号。
+					if claudeAttemptCommitted(c, preContentTracker, useEffectiveContent, writerSizeBeforeForward) {
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
 					}
-					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, failoverErr)
+					activeFS := fs
+					if selection.Standby {
+						activeFS = standbyFS
+					} else {
+						willExclude := !failoverErr.RetryableOnSameAccount || fs.SameAccountRetryCount[account.ID] >= maxSameAccountRetries
+						if willExclude {
+							h.gatewayService.RecordPrimaryFailure(c.Request.Context(), currentAPIKey.GroupID, reqModel, selection, failoverErr)
+							primaryFailureObserved = true
+						}
+					}
+					action := activeFS.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, failoverErr)
 					switch action {
 					case FailoverContinue:
 						continue
 					case FailoverExhausted:
-						h.handleFailoverExhausted(c, fs.LastFailoverErr, account.Platform, streamStarted)
+						h.handleFailoverExhausted(c, activeFS.LastFailoverErr, account.Platform, claudeResponseStreamStarted(c, streamStarted))
 						return
 					case FailoverCanceled:
+						h.handlePreContentRoutingDeadline(c, preContentTracker)
 						return
 					}
 				}
@@ -905,6 +965,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
 				return
 			}
+			routeAudit.Complete(selection)
+			h.gatewayService.RecordPrimaryProbeSuccess(c.Request.Context(), currentAPIKey.GroupID, reqModel, selection)
 
 			// RPM 计数递增（Forward 成功后）
 			// 注意：TOCTOU 竞态是已知且可接受的设计权衡，与 WindowCost 一致的 soft-limit 模式。
@@ -920,7 +982,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			// - 选中账号与粘性账号一致：刷新 TTL
 			// - 粘性账号因负载/RPM 被跳过、选中了其他账号：不覆盖原绑定，
 			//   下次请求粘性账号恢复后仍可命中
-			if sessionKey != "" && (sessionBoundAccountID == 0 || sessionBoundAccountID == account.ID) {
+			if !selection.Standby && sessionKey != "" && (sessionBoundAccountID == 0 || sessionBoundAccountID == account.ID) {
 				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
@@ -940,8 +1002,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 			// 使用量记录通过有界 worker 池提交，避免请求热路径创建无界 goroutine。
 			// ForceCacheBilling 提前拍成标量，避免 worker 闭包保活 failover 状态里的响应体。
-			forceCacheBilling := fs.ForceCacheBilling
+			forceCacheBilling := fs.ForceCacheBilling || standbyFS.ForceCacheBilling
 			quotaPlatform := service.QuotaPlatform(c.Request.Context(), currentAPIKey)
+			routeAuditSnapshot := routeAudit.Snapshot()
 			h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 					Result:             result,
@@ -957,6 +1020,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					RequestPayloadHash: requestPayloadHash,
 					ForceCacheBilling:  forceCacheBilling,
 					APIKeyService:      h.apiKeyService,
+					RouteAudit:         routeAuditSnapshot,
 					ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
 				}); err != nil {
 					logger.L().With(
@@ -1511,6 +1575,42 @@ func (h *GatewayHandler) calculateSubscriptionRemaining(group *service.Group, su
 func (h *GatewayHandler) handleConcurrencyError(c *gin.Context, err error, slotType string, streamStarted bool) {
 	status, errType, message := concurrencyErrorResponse(err, slotType)
 	h.handleStreamingAwareError(c, status, errType, message, streamStarted)
+}
+
+func claudeAttemptCommitted(c *gin.Context, tracker *service.PreContentTracker, useEffectiveContent bool, writerSizeBeforeForward int) bool {
+	if useEffectiveContent {
+		return tracker != nil && tracker.HasEffectiveContent()
+	}
+	return c != nil && c.Writer != nil && c.Writer.Size() != writerSizeBeforeForward
+}
+
+func shouldAttemptStandby(selectionErr error, primaryFailureObserved bool) bool {
+	return primaryFailureObserved || errors.Is(selectionErr, service.ErrPrimaryCircuitOpen)
+}
+
+func claudeResponseStreamStarted(c *gin.Context, explicit bool) bool {
+	if explicit || c == nil || c.Writer == nil {
+		return explicit
+	}
+	if c.Writer.Written() {
+		return true
+	}
+	return strings.Contains(strings.ToLower(c.Writer.Header().Get("Content-Type")), "text/event-stream")
+}
+
+func (h *GatewayHandler) handlePreContentRoutingDeadline(c *gin.Context, tracker *service.PreContentTracker) bool {
+	if tracker == nil || !tracker.DeadlineExceeded() {
+		return false
+	}
+	streamStarted := claudeResponseStreamStarted(c, false)
+	h.handleStreamingAwareError(
+		c,
+		http.StatusGatewayTimeout,
+		"timeout_error",
+		"Routing deadline exceeded before model response",
+		streamStarted,
+	)
+	return true
 }
 
 func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError, platform string, streamStarted bool) {

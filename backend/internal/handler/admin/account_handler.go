@@ -93,43 +93,78 @@ func NewAccountHandler(
 	}
 }
 
+type AccountGroupMembershipRequest struct {
+	GroupID      int64             `json:"group_id" binding:"required,gt=0"`
+	Priority     *int              `json:"priority"`
+	Role         string            `json:"role" binding:"omitempty,oneof=primary standby"`
+	Enabled      *bool             `json:"enabled"`
+	ModelMapping map[string]string `json:"model_mapping"`
+}
+
 // CreateAccountRequest represents create account request
 type CreateAccountRequest struct {
-	Name                    string         `json:"name" binding:"required"`
-	Notes                   *string        `json:"notes"`
-	Platform                string         `json:"platform" binding:"required"`
-	Type                    string         `json:"type" binding:"required,oneof=oauth setup-token apikey upstream bedrock service_account"`
-	Credentials             map[string]any `json:"credentials" binding:"required"`
-	Extra                   map[string]any `json:"extra"`
-	ProxyID                 *int64         `json:"proxy_id"`
-	Concurrency             int            `json:"concurrency"`
-	Priority                int            `json:"priority"`
-	RateMultiplier          *float64       `json:"rate_multiplier"`
-	LoadFactor              *int           `json:"load_factor"`
-	GroupIDs                []int64        `json:"group_ids"`
-	ExpiresAt               *int64         `json:"expires_at"`
-	AutoPauseOnExpired      *bool          `json:"auto_pause_on_expired"`
-	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
+	Name                    string                          `json:"name" binding:"required"`
+	Notes                   *string                         `json:"notes"`
+	Platform                string                          `json:"platform" binding:"required"`
+	Type                    string                          `json:"type" binding:"required,oneof=oauth setup-token apikey upstream bedrock service_account"`
+	Credentials             map[string]any                  `json:"credentials" binding:"required"`
+	Extra                   map[string]any                  `json:"extra"`
+	ProxyID                 *int64                          `json:"proxy_id"`
+	Concurrency             int                             `json:"concurrency"`
+	Priority                int                             `json:"priority"`
+	RateMultiplier          *float64                        `json:"rate_multiplier"`
+	LoadFactor              *int                            `json:"load_factor"`
+	GroupIDs                []int64                         `json:"group_ids"`
+	AccountGroups           []AccountGroupMembershipRequest `json:"account_groups" binding:"omitempty,dive"`
+	ExpiresAt               *int64                          `json:"expires_at"`
+	AutoPauseOnExpired      *bool                           `json:"auto_pause_on_expired"`
+	ConfirmMixedChannelRisk *bool                           `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
 
 // UpdateAccountRequest represents update account request
 // 使用指针类型来区分"未提供"和"设置为0"
 type UpdateAccountRequest struct {
-	Name                    string         `json:"name"`
-	Notes                   *string        `json:"notes"`
-	Type                    string         `json:"type" binding:"omitempty,oneof=oauth setup-token apikey upstream bedrock service_account"`
-	Credentials             map[string]any `json:"credentials"`
-	Extra                   map[string]any `json:"extra"`
-	ProxyID                 *int64         `json:"proxy_id"`
-	Concurrency             *int           `json:"concurrency"`
-	Priority                *int           `json:"priority"`
-	RateMultiplier          *float64       `json:"rate_multiplier"`
-	LoadFactor              *int           `json:"load_factor"`
-	Status                  string         `json:"status" binding:"omitempty,oneof=active inactive error"`
-	GroupIDs                *[]int64       `json:"group_ids"`
-	ExpiresAt               *int64         `json:"expires_at"`
-	AutoPauseOnExpired      *bool          `json:"auto_pause_on_expired"`
-	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
+	Name                    string                           `json:"name"`
+	Notes                   *string                          `json:"notes"`
+	Type                    string                           `json:"type" binding:"omitempty,oneof=oauth setup-token apikey upstream bedrock service_account"`
+	Credentials             map[string]any                   `json:"credentials"`
+	Extra                   map[string]any                   `json:"extra"`
+	ProxyID                 *int64                           `json:"proxy_id"`
+	Concurrency             *int                             `json:"concurrency"`
+	Priority                *int                             `json:"priority"`
+	RateMultiplier          *float64                         `json:"rate_multiplier"`
+	LoadFactor              *int                             `json:"load_factor"`
+	Status                  string                           `json:"status" binding:"omitempty,oneof=active inactive error"`
+	GroupIDs                *[]int64                         `json:"group_ids"`
+	AccountGroups           *[]AccountGroupMembershipRequest `json:"account_groups" binding:"omitempty,dive"`
+	ExpiresAt               *int64                           `json:"expires_at"`
+	AutoPauseOnExpired      *bool                            `json:"auto_pause_on_expired"`
+	ConfirmMixedChannelRisk *bool                            `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
+}
+
+func accountGroupInputsFromRequest(requests []AccountGroupMembershipRequest) []service.AccountGroupInput {
+	if requests == nil {
+		return nil
+	}
+	inputs := make([]service.AccountGroupInput, 0, len(requests))
+	for _, request := range requests {
+		inputs = append(inputs, service.AccountGroupInput{
+			GroupID:      request.GroupID,
+			Priority:     request.Priority,
+			Role:         request.Role,
+			Enabled:      request.Enabled,
+			ModelMapping: request.ModelMapping,
+		})
+	}
+	return inputs
+}
+
+func optionalAccountGroupInputsFromRequest(requests *[]AccountGroupMembershipRequest) *[]service.AccountGroupInput {
+	if requests == nil {
+		return nil
+	}
+	inputs := accountGroupInputsFromRequest(*requests)
+	return &inputs
 }
 
 // BulkUpdateAccountsRequest represents the payload for bulk editing accounts
@@ -546,6 +581,7 @@ func (h *AccountHandler) Create(c *gin.Context) {
 			RateMultiplier:        req.RateMultiplier,
 			LoadFactor:            req.LoadFactor,
 			GroupIDs:              req.GroupIDs,
+			AccountGroups:         accountGroupInputsFromRequest(req.AccountGroups),
 			ExpiresAt:             req.ExpiresAt,
 			AutoPauseOnExpired:    req.AutoPauseOnExpired,
 			SkipMixedChannelCheck: skipCheck,
@@ -625,6 +661,7 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		LoadFactor:            req.LoadFactor,
 		Status:                req.Status,
 		GroupIDs:              req.GroupIDs,
+		AccountGroups:         optionalAccountGroupInputsFromRequest(req.AccountGroups),
 		ExpiresAt:             req.ExpiresAt,
 		AutoPauseOnExpired:    req.AutoPauseOnExpired,
 		SkipMixedChannelCheck: skipCheck,

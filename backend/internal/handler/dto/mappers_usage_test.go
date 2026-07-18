@@ -148,6 +148,54 @@ func TestUsageLogFromService_FallsBackToLegacyModelWhenRequestedModelMissing(t *
 	require.Equal(t, "claude-3", adminDTO.Model)
 }
 
+func TestUsageLogFromService_IncludesNormalizedRouteAuditForUserAndAdmin(t *testing.T) {
+	t.Parallel()
+
+	mappingRule := "gpt-5.1 -> gpt-5.4"
+	log := &service.UsageLog{
+		AccountID:         303,
+		RequestID:         "req_route_audit",
+		Model:             "gpt-5.1",
+		RouteMode:         service.RouteModeStandby,
+		RouteMappingRule:  &mappingRule,
+		RouteAttemptCount: 3,
+		RouteFailures: []service.RouteFailureEntry{
+			{AccountID: 101, StatusCode: 502, Kind: "upstream_5xx"},
+		},
+	}
+
+	userDTO := UsageLogFromService(log)
+	adminDTO := UsageLogFromServiceAdmin(log)
+	for _, got := range []*UsageLog{userDTO, &adminDTO.UsageLog} {
+		require.Equal(t, service.RouteModeStandby, got.RouteMode)
+		require.NotNil(t, got.RouteMappingRule)
+		require.Equal(t, mappingRule, *got.RouteMappingRule)
+		require.Equal(t, 3, got.RouteAttemptCount)
+		require.Equal(t, []RouteFailureEntry{{AccountID: 101, StatusCode: 502, Kind: "upstream_5xx"}}, got.RouteFailures)
+	}
+}
+
+func TestUsageLogFromService_NormalizesHistoricalRouteAudit(t *testing.T) {
+	t.Parallel()
+
+	staleRule := "stale mapping"
+	dto := UsageLogFromService(&service.UsageLog{
+		RequestID:         "req_historical_route",
+		Model:             "claude-3",
+		RouteMappingRule:  &staleRule,
+		RouteAttemptCount: 0,
+	})
+
+	require.Equal(t, service.RouteModePrimary, dto.RouteMode)
+	require.Nil(t, dto.RouteMappingRule)
+	require.Equal(t, 1, dto.RouteAttemptCount)
+	require.NotNil(t, dto.RouteFailures)
+	require.Empty(t, dto.RouteFailures)
+	body, err := json.Marshal(dto)
+	require.NoError(t, err)
+	require.Contains(t, string(body), `"route_failures":[]`)
+}
+
 func TestUsageLogFromService_IncludesImageBillingMetadataForUserAndAdmin(t *testing.T) {
 	t.Parallel()
 

@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -139,6 +140,73 @@ func (_u *UsageLogUpdate) SetNillableUpstreamModel(v *string) *UsageLogUpdate {
 // ClearUpstreamModel clears the value of the "upstream_model" field.
 func (_u *UsageLogUpdate) ClearUpstreamModel() *UsageLogUpdate {
 	_u.mutation.ClearUpstreamModel()
+	return _u
+}
+
+// SetRouteMode sets the "route_mode" field.
+func (_u *UsageLogUpdate) SetRouteMode(v string) *UsageLogUpdate {
+	_u.mutation.SetRouteMode(v)
+	return _u
+}
+
+// SetNillableRouteMode sets the "route_mode" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableRouteMode(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetRouteMode(*v)
+	}
+	return _u
+}
+
+// SetRouteMappingRule sets the "route_mapping_rule" field.
+func (_u *UsageLogUpdate) SetRouteMappingRule(v string) *UsageLogUpdate {
+	_u.mutation.SetRouteMappingRule(v)
+	return _u
+}
+
+// SetNillableRouteMappingRule sets the "route_mapping_rule" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableRouteMappingRule(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetRouteMappingRule(*v)
+	}
+	return _u
+}
+
+// ClearRouteMappingRule clears the value of the "route_mapping_rule" field.
+func (_u *UsageLogUpdate) ClearRouteMappingRule() *UsageLogUpdate {
+	_u.mutation.ClearRouteMappingRule()
+	return _u
+}
+
+// SetRouteAttemptCount sets the "route_attempt_count" field.
+func (_u *UsageLogUpdate) SetRouteAttemptCount(v int) *UsageLogUpdate {
+	_u.mutation.ResetRouteAttemptCount()
+	_u.mutation.SetRouteAttemptCount(v)
+	return _u
+}
+
+// SetNillableRouteAttemptCount sets the "route_attempt_count" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableRouteAttemptCount(v *int) *UsageLogUpdate {
+	if v != nil {
+		_u.SetRouteAttemptCount(*v)
+	}
+	return _u
+}
+
+// AddRouteAttemptCount adds value to the "route_attempt_count" field.
+func (_u *UsageLogUpdate) AddRouteAttemptCount(v int) *UsageLogUpdate {
+	_u.mutation.AddRouteAttemptCount(v)
+	return _u
+}
+
+// SetRouteFailures sets the "route_failures" field.
+func (_u *UsageLogUpdate) SetRouteFailures(v []map[string]interface{}) *UsageLogUpdate {
+	_u.mutation.SetRouteFailures(v)
+	return _u
+}
+
+// AppendRouteFailures appends value to the "route_failures" field.
+func (_u *UsageLogUpdate) AppendRouteFailures(v []map[string]interface{}) *UsageLogUpdate {
+	_u.mutation.AppendRouteFailures(v)
 	return _u
 }
 
@@ -934,6 +1002,16 @@ func (_u *UsageLogUpdate) check() error {
 			return &ValidationError{Name: "upstream_model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.upstream_model": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RouteMode(); ok {
+		if err := usagelog.RouteModeValidator(v); err != nil {
+			return &ValidationError{Name: "route_mode", err: fmt.Errorf(`ent: validator failed for field "UsageLog.route_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RouteMappingRule(); ok {
+		if err := usagelog.RouteMappingRuleValidator(v); err != nil {
+			return &ValidationError{Name: "route_mapping_rule", err: fmt.Errorf(`ent: validator failed for field "UsageLog.route_mapping_rule": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ModelMappingChain(); ok {
 		if err := usagelog.ModelMappingChainValidator(v); err != nil {
 			return &ValidationError{Name: "model_mapping_chain", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model_mapping_chain": %w`, err)}
@@ -1020,6 +1098,29 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.UpstreamModelCleared() {
 		_spec.ClearField(usagelog.FieldUpstreamModel, field.TypeString)
+	}
+	if value, ok := _u.mutation.RouteMode(); ok {
+		_spec.SetField(usagelog.FieldRouteMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RouteMappingRule(); ok {
+		_spec.SetField(usagelog.FieldRouteMappingRule, field.TypeString, value)
+	}
+	if _u.mutation.RouteMappingRuleCleared() {
+		_spec.ClearField(usagelog.FieldRouteMappingRule, field.TypeString)
+	}
+	if value, ok := _u.mutation.RouteAttemptCount(); ok {
+		_spec.SetField(usagelog.FieldRouteAttemptCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRouteAttemptCount(); ok {
+		_spec.AddField(usagelog.FieldRouteAttemptCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RouteFailures(); ok {
+		_spec.SetField(usagelog.FieldRouteFailures, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedRouteFailures(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, usagelog.FieldRouteFailures, value)
+		})
 	}
 	if value, ok := _u.mutation.ChannelID(); ok {
 		_spec.SetField(usagelog.FieldChannelID, field.TypeInt64, value)
@@ -1485,6 +1586,73 @@ func (_u *UsageLogUpdateOne) SetNillableUpstreamModel(v *string) *UsageLogUpdate
 // ClearUpstreamModel clears the value of the "upstream_model" field.
 func (_u *UsageLogUpdateOne) ClearUpstreamModel() *UsageLogUpdateOne {
 	_u.mutation.ClearUpstreamModel()
+	return _u
+}
+
+// SetRouteMode sets the "route_mode" field.
+func (_u *UsageLogUpdateOne) SetRouteMode(v string) *UsageLogUpdateOne {
+	_u.mutation.SetRouteMode(v)
+	return _u
+}
+
+// SetNillableRouteMode sets the "route_mode" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableRouteMode(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetRouteMode(*v)
+	}
+	return _u
+}
+
+// SetRouteMappingRule sets the "route_mapping_rule" field.
+func (_u *UsageLogUpdateOne) SetRouteMappingRule(v string) *UsageLogUpdateOne {
+	_u.mutation.SetRouteMappingRule(v)
+	return _u
+}
+
+// SetNillableRouteMappingRule sets the "route_mapping_rule" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableRouteMappingRule(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetRouteMappingRule(*v)
+	}
+	return _u
+}
+
+// ClearRouteMappingRule clears the value of the "route_mapping_rule" field.
+func (_u *UsageLogUpdateOne) ClearRouteMappingRule() *UsageLogUpdateOne {
+	_u.mutation.ClearRouteMappingRule()
+	return _u
+}
+
+// SetRouteAttemptCount sets the "route_attempt_count" field.
+func (_u *UsageLogUpdateOne) SetRouteAttemptCount(v int) *UsageLogUpdateOne {
+	_u.mutation.ResetRouteAttemptCount()
+	_u.mutation.SetRouteAttemptCount(v)
+	return _u
+}
+
+// SetNillableRouteAttemptCount sets the "route_attempt_count" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableRouteAttemptCount(v *int) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetRouteAttemptCount(*v)
+	}
+	return _u
+}
+
+// AddRouteAttemptCount adds value to the "route_attempt_count" field.
+func (_u *UsageLogUpdateOne) AddRouteAttemptCount(v int) *UsageLogUpdateOne {
+	_u.mutation.AddRouteAttemptCount(v)
+	return _u
+}
+
+// SetRouteFailures sets the "route_failures" field.
+func (_u *UsageLogUpdateOne) SetRouteFailures(v []map[string]interface{}) *UsageLogUpdateOne {
+	_u.mutation.SetRouteFailures(v)
+	return _u
+}
+
+// AppendRouteFailures appends value to the "route_failures" field.
+func (_u *UsageLogUpdateOne) AppendRouteFailures(v []map[string]interface{}) *UsageLogUpdateOne {
+	_u.mutation.AppendRouteFailures(v)
 	return _u
 }
 
@@ -2293,6 +2461,16 @@ func (_u *UsageLogUpdateOne) check() error {
 			return &ValidationError{Name: "upstream_model", err: fmt.Errorf(`ent: validator failed for field "UsageLog.upstream_model": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RouteMode(); ok {
+		if err := usagelog.RouteModeValidator(v); err != nil {
+			return &ValidationError{Name: "route_mode", err: fmt.Errorf(`ent: validator failed for field "UsageLog.route_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RouteMappingRule(); ok {
+		if err := usagelog.RouteMappingRuleValidator(v); err != nil {
+			return &ValidationError{Name: "route_mapping_rule", err: fmt.Errorf(`ent: validator failed for field "UsageLog.route_mapping_rule": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ModelMappingChain(); ok {
 		if err := usagelog.ModelMappingChainValidator(v); err != nil {
 			return &ValidationError{Name: "model_mapping_chain", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model_mapping_chain": %w`, err)}
@@ -2396,6 +2574,29 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if _u.mutation.UpstreamModelCleared() {
 		_spec.ClearField(usagelog.FieldUpstreamModel, field.TypeString)
+	}
+	if value, ok := _u.mutation.RouteMode(); ok {
+		_spec.SetField(usagelog.FieldRouteMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RouteMappingRule(); ok {
+		_spec.SetField(usagelog.FieldRouteMappingRule, field.TypeString, value)
+	}
+	if _u.mutation.RouteMappingRuleCleared() {
+		_spec.ClearField(usagelog.FieldRouteMappingRule, field.TypeString)
+	}
+	if value, ok := _u.mutation.RouteAttemptCount(); ok {
+		_spec.SetField(usagelog.FieldRouteAttemptCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRouteAttemptCount(); ok {
+		_spec.AddField(usagelog.FieldRouteAttemptCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RouteFailures(); ok {
+		_spec.SetField(usagelog.FieldRouteFailures, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedRouteFailures(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, usagelog.FieldRouteFailures, value)
+		})
 	}
 	if value, ok := _u.mutation.ChannelID(); ok {
 		_spec.SetField(usagelog.FieldChannelID, field.TypeInt64, value)

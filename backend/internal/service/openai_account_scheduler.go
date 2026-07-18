@@ -427,23 +427,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 }
 
 func openAIStickyAccountMatchesGroup(account *Account, groupID *int64) bool {
-	if account == nil {
-		return false
-	}
-	if groupID == nil {
-		return len(account.AccountGroups) == 0 && len(account.GroupIDs) == 0
-	}
-	for _, accountGroupID := range account.GroupIDs {
-		if accountGroupID == *groupID {
-			return true
-		}
-	}
-	for _, accountGroup := range account.AccountGroups {
-		if accountGroup.GroupID == *groupID {
-			return true
-		}
-	}
-	return false
+	return enabledPrimaryMembership(account, groupID)
 }
 
 func (s *defaultOpenAIAccountScheduler) shouldEscapeStickyAccount(accountID int64, cfg openAIStickyEscapeConfig) (reason string, errorRate float64, ttft float64, shouldEscape bool) {
@@ -1212,7 +1196,7 @@ func (s *OpenAIGatewayService) SelectAccountWithSchedulerForImages(
 	return selection, decision, err
 }
 
-func (s *OpenAIGatewayService) selectAccountWithScheduler(
+func (s *OpenAIGatewayService) selectPrimaryAccountWithScheduler(
 	ctx context.Context,
 	groupID *int64,
 	previousResponseID string,

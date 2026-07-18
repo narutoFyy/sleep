@@ -467,10 +467,13 @@ func filterSchedulerAccountGroups(accountGroups []service.AccountGroup) []servic
 			continue
 		}
 		filtered = append(filtered, service.AccountGroup{
-			AccountID: ag.AccountID,
-			GroupID:   ag.GroupID,
-			Priority:  ag.Priority,
-			CreatedAt: ag.CreatedAt,
+			AccountID:    ag.AccountID,
+			GroupID:      ag.GroupID,
+			Priority:     ag.Priority,
+			Role:         ag.Role,
+			Enabled:      ag.Enabled,
+			ModelMapping: ag.ModelMapping,
+			CreatedAt:    ag.CreatedAt,
 		})
 	}
 	if len(filtered) == 0 {

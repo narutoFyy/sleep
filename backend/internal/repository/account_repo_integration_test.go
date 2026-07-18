@@ -558,6 +558,29 @@ func (s *AccountRepoSuite) TestBindGroups_EmptyList() {
 	s.Require().Empty(groups, "expected 0 groups after binding empty list")
 }
 
+func (s *AccountRepoSuite) TestBindAccountGroups_RoundTripsMembershipFields() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-membership"})
+	group := mustCreateGroup(s.T(), s.client, &service.Group{Name: "g-membership"})
+	mapping := map[string]string{"claude-opus-*": "claude-sonnet-4-6"}
+
+	s.Require().NoError(s.repo.BindAccountGroups(s.ctx, account.ID, []service.AccountGroup{{
+		GroupID:      group.ID,
+		Priority:     17,
+		Role:         service.AccountGroupRoleStandby,
+		Enabled:      false,
+		ModelMapping: mapping,
+	}}))
+
+	got, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Len(got.AccountGroups, 1)
+	s.Require().Equal(group.ID, got.AccountGroups[0].GroupID)
+	s.Require().Equal(17, got.AccountGroups[0].Priority)
+	s.Require().Equal(service.AccountGroupRoleStandby, got.AccountGroups[0].Role)
+	s.Require().False(got.AccountGroups[0].Enabled)
+	s.Require().Equal(mapping, got.AccountGroups[0].ModelMapping)
+}
+
 // --- Schedulable ---
 
 func (s *AccountRepoSuite) TestListSchedulable() {

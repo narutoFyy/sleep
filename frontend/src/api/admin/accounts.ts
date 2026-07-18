@@ -19,7 +19,8 @@ import type {
   CodexSessionImportRequest,
   CodexSessionImportResult,
   CheckMixedChannelRequest,
-  CheckMixedChannelResponse
+  CheckMixedChannelResponse,
+  AccountGroupMembership
 } from '@/types'
 
 /**
@@ -56,6 +57,27 @@ export async function list(
     signal: options?.signal
   })
   return data
+}
+
+/**
+ * List all accounts matching the supplied filters. The group standby editor
+ * needs a complete compatible-account set rather than one paginated page.
+ */
+export async function listAll(
+  filters?: Parameters<typeof list>[2]
+): Promise<PaginatedResponse<Account>['items']> {
+  const accounts: PaginatedResponse<Account>['items'] = []
+  let page = 1
+  let pages = 1
+
+  do {
+    const response = await list(page, 100, filters)
+    accounts.push(...response.items)
+    pages = response.pages || 1
+    page += 1
+  } while (page <= pages && page <= 100)
+
+  return accounts
 }
 
 export interface AccountListWithEtagResult {
@@ -143,6 +165,17 @@ export async function create(accountData: CreateAccountRequest): Promise<Account
  */
 export async function update(id: number, updates: UpdateAccountRequest): Promise<Account> {
   const { data } = await apiClient.put<Account>(`/admin/accounts/${id}`, updates)
+  return data
+}
+
+/** Update only the account-group memberships, preserving account credentials and other fields. */
+export async function updateGroupMemberships(
+  id: number,
+  accountGroups: AccountGroupMembership[]
+): Promise<Account> {
+  const { data } = await apiClient.put<Account>(`/admin/accounts/${id}`, {
+    account_groups: accountGroups
+  })
   return data
 }
 
@@ -707,10 +740,12 @@ export async function setPrivacy(id: number): Promise<Account> {
 
 export const accountsAPI = {
   list,
+  listAll,
   listWithEtag,
   getById,
   create,
   update,
+  updateGroupMemberships,
   checkMixedChannelRisk,
   delete: deleteAccount,
   toggleStatus,
