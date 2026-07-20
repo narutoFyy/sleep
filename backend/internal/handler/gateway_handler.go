@@ -592,8 +592,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		fs := NewFailoverState(h.maxAccountSwitches, hasBoundSession)
 		fs.MaxSwitches = int(^uint(0) >> 1)
 		standbyFS := NewFailoverState(fs.MaxSwitches, hasBoundSession)
+		for accountID := range h.gatewayService.AbnormalOutputIsolatedAccounts(subject.UserID, currentAPIKey.GroupID, reqModel) {
+			fs.FailedAccountIDs[accountID] = struct{}{}
+		}
 		primaryFailureObserved := false
 		retryWithFallback := false
+		continuationText := ""
+		continuationTextBlockIndex := 0
+		var continuationOriginalUsage service.ClaudeUsage
 
 		for {
 			attemptParsedReq, err := parsedReq.CloneForBody(body)
@@ -830,6 +836,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if totalSwitchCount > 0 {
 				requestCtx = service.WithAccountSwitchCount(requestCtx, totalSwitchCount, h.metadataBridgeEnabled())
 			}
+			if continuationText != "" {
+				requestCtx = service.WithAnthropicContinuation(requestCtx, continuationText, continuationTextBlockIndex, continuationOriginalUsage)
+			}
 			if selection.Standby {
 				requestCtx = service.WithStandbyClientModel(requestCtx, reqModel)
 			}
@@ -912,18 +921,51 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
 					routeAudit.RecordFailure(selection, failoverErr)
+					var abnormalErr *service.AbnormalOutputFailoverError
+					isAbnormalOutput := errors.As(err, &abnormalErr)
+					isContinuationPreContentFailure := continuationText != "" && preContentTracker != nil && !preContentTracker.HasEffectiveContent()
 					// 仅有效模型内容会提交 Anthropic 尝试；元数据和 ping 不阻止换号。
-					if claudeAttemptCommitted(c, preContentTracker, useEffectiveContent, writerSizeBeforeForward) {
+					if claudeAttemptCommitted(c, preContentTracker, useEffectiveContent, writerSizeBeforeForward) && !isAbnormalOutput && !isContinuationPreContentFailure {
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
+					}
+					if isAbnormalOutput {
+						h.gatewayService.RecordAbnormalOutputIsolation(subject.UserID, currentAPIKey.GroupID, reqModel, account.ID)
+						continuationText = abnormalErr.VisibleText
+						continuationTextBlockIndex = abnormalErr.TextBlockIndex
+						continuationOriginalUsage = abnormalErr.OriginalUsage
+						if abnormalErr.Committed {
+							_, _ = fmt.Fprintf(c.Writer, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":%d}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":%d,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n", abnormalErr.TextBlockIndex, abnormalErr.TextBlockIndex+1)
+							if flusher, ok := c.Writer.(http.Flusher); ok {
+								flusher.Flush()
+							}
+							preContentTracker.AllowContinuationRetry()
+						}
+						if sessionKey != "" {
+							if clearErr := h.gatewayService.ClearStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey); clearErr != nil {
+								reqLog.Warn("gateway.abnormal_output_clear_sticky_failed", zap.Int64("account_id", account.ID), zap.Error(clearErr))
+							}
+						}
+						sessionBoundAccountID = 0
+						reqLog.Warn("gateway.abnormal_output_failover",
+							zap.Int64("account_id", account.ID),
+							zap.String("reason", abnormalErr.Reason),
+							zap.Int("repeat_count", abnormalErr.RepeatCount),
+							zap.Bool("committed", abnormalErr.Committed),
+						)
+					}
+					if isContinuationPreContentFailure {
+						reqLog.Warn("gateway.abnormal_output_continuation_failover", zap.Int64("account_id", account.ID), zap.Int("upstream_status", failoverErr.StatusCode))
 					}
 					activeFS := fs
 					if selection.Standby {
 						activeFS = standbyFS
 					} else {
 						willExclude := !failoverErr.RetryableOnSameAccount || fs.SameAccountRetryCount[account.ID] >= maxSameAccountRetries
-						if willExclude {
+						if willExclude && !isAbnormalOutput {
 							h.gatewayService.RecordPrimaryFailure(c.Request.Context(), currentAPIKey.GroupID, reqModel, selection, failoverErr)
+						}
+						if willExclude {
 							primaryFailureObserved = true
 						}
 					}

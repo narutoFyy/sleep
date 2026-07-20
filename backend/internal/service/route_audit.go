@@ -65,11 +65,12 @@ func (a *RouteAudit) RecordFailure(selection *AccountSelectionResult, failoverEr
 	if a == nil || selection == nil || selection.Account == nil || failoverErr == nil || len(a.Failures) >= maxRouteAuditFailures {
 		return
 	}
+	kind := normalizeRouteFailureKind(failoverErr.FailoverReason, failoverErr.StatusCode)
 	a.Failures = append(a.Failures, RouteFailureEntry{
 		AccountID:  selection.Account.ID,
 		Standby:    selection.Standby,
 		StatusCode: failoverErr.StatusCode,
-		Kind:       stableRouteFailureKind(failoverErr.StatusCode),
+		Kind:       kind,
 	})
 }
 
@@ -111,7 +112,7 @@ func (a *RouteAudit) Snapshot() RouteAudit {
 
 func normalizeRouteFailureKind(kind string, statusCode int) string {
 	switch strings.TrimSpace(kind) {
-	case "transport_error", "timeout", "rate_limited", "upstream_4xx", "upstream_5xx", "upstream_error":
+	case "transport_error", "timeout", "rate_limited", "upstream_4xx", "upstream_5xx", "upstream_error", "abnormal_output":
 		return strings.TrimSpace(kind)
 	default:
 		return stableRouteFailureKind(statusCode)

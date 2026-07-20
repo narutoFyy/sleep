@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -584,6 +585,7 @@ type UpstreamFailoverError struct {
 	ResponseHeaders        http.Header // 上游响应头，用于透传 cf-ray/cf-mitigated/content-type 等诊断信息
 	ForceCacheBilling      bool        // Antigravity 粘性会话切换时设为 true
 	RetryableOnSameAccount bool        // 临时性错误（如 Google 间歇性 400、空响应），应在同一账号上重试 N 次再切换
+	FailoverReason         string      // Stable internal audit reason; never contains response text.
 }
 
 func (e *UpstreamFailoverError) Error() string {
@@ -607,43 +609,45 @@ func (s *GatewayService) TempUnscheduleRetryableError(ctx context.Context, accou
 
 // GatewayService handles API gateway operations
 type GatewayService struct {
-	accountRepo           AccountRepository
-	groupRepo             GroupRepository
-	usageLogRepo          UsageLogRepository
-	usageBillingRepo      UsageBillingRepository
-	userRepo              UserRepository
-	userSubRepo           UserSubscriptionRepository
-	userGroupRateRepo     UserGroupRateRepository
-	cache                 GatewayCache
-	digestStore           *DigestSessionStore
-	cfg                   *config.Config
-	schedulerSnapshot     *SchedulerSnapshotService
-	billingService        *BillingService
-	rateLimitService      *RateLimitService
-	billingCacheService   *BillingCacheService
-	identityService       *IdentityService
-	httpUpstream          HTTPUpstream
-	deferredService       *DeferredService
-	concurrencyService    *ConcurrencyService
-	claudeTokenProvider   *ClaudeTokenProvider
-	sessionLimitCache     SessionLimitCache // 会话数量限制缓存（仅 Anthropic OAuth/SetupToken）
-	rpmCache              RPMCache          // RPM 计数缓存（仅 Anthropic OAuth/SetupToken）
-	userGroupRateResolver *userGroupRateResolver
-	userGroupRateCache    *gocache.Cache
-	userGroupRateSF       singleflight.Group
-	modelsListCache       *gocache.Cache
-	modelsListCacheTTL    time.Duration
-	settingService        *SettingService
-	responseHeaderFilter  *responseheaders.CompiledHeaderFilter
-	debugModelRouting     atomic.Bool
-	debugClaudeMimic      atomic.Bool
-	channelService        *ChannelService
-	resolver              *ModelPricingResolver
-	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
-	tlsFPProfileService   *TLSFingerprintProfileService
-	balanceNotifyService  *BalanceNotifyService
-	userPlatformQuotaRepo UserPlatformQuotaRepository
-	primaryHealthService  *PrimaryHealthService
+	accountRepo                  AccountRepository
+	groupRepo                    GroupRepository
+	usageLogRepo                 UsageLogRepository
+	usageBillingRepo             UsageBillingRepository
+	userRepo                     UserRepository
+	userSubRepo                  UserSubscriptionRepository
+	userGroupRateRepo            UserGroupRateRepository
+	cache                        GatewayCache
+	digestStore                  *DigestSessionStore
+	cfg                          *config.Config
+	schedulerSnapshot            *SchedulerSnapshotService
+	billingService               *BillingService
+	rateLimitService             *RateLimitService
+	billingCacheService          *BillingCacheService
+	identityService              *IdentityService
+	httpUpstream                 HTTPUpstream
+	deferredService              *DeferredService
+	concurrencyService           *ConcurrencyService
+	claudeTokenProvider          *ClaudeTokenProvider
+	sessionLimitCache            SessionLimitCache // 会话数量限制缓存（仅 Anthropic OAuth/SetupToken）
+	rpmCache                     RPMCache          // RPM 计数缓存（仅 Anthropic OAuth/SetupToken）
+	userGroupRateResolver        *userGroupRateResolver
+	userGroupRateCache           *gocache.Cache
+	userGroupRateSF              singleflight.Group
+	modelsListCache              *gocache.Cache
+	modelsListCacheTTL           time.Duration
+	settingService               *SettingService
+	responseHeaderFilter         *responseheaders.CompiledHeaderFilter
+	debugModelRouting            atomic.Bool
+	debugClaudeMimic             atomic.Bool
+	channelService               *ChannelService
+	resolver                     *ModelPricingResolver
+	debugGatewayBodyFile         atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
+	tlsFPProfileService          *TLSFingerprintProfileService
+	balanceNotifyService         *BalanceNotifyService
+	userPlatformQuotaRepo        UserPlatformQuotaRepository
+	primaryHealthService         *PrimaryHealthService
+	abnormalOutputIsolationCache *gocache.Cache
+	abnormalOutputIsolationMu    sync.Mutex
 }
 
 // NewGatewayService creates a new GatewayService
@@ -681,38 +685,39 @@ func NewGatewayService(
 	modelsListTTL := resolveModelsListCacheTTL(cfg)
 
 	svc := &GatewayService{
-		accountRepo:           accountRepo,
-		groupRepo:             groupRepo,
-		usageLogRepo:          usageLogRepo,
-		usageBillingRepo:      usageBillingRepo,
-		userRepo:              userRepo,
-		userSubRepo:           userSubRepo,
-		userGroupRateRepo:     userGroupRateRepo,
-		cache:                 cache,
-		digestStore:           digestStore,
-		cfg:                   cfg,
-		schedulerSnapshot:     schedulerSnapshot,
-		concurrencyService:    concurrencyService,
-		billingService:        billingService,
-		rateLimitService:      rateLimitService,
-		billingCacheService:   billingCacheService,
-		identityService:       identityService,
-		httpUpstream:          httpUpstream,
-		deferredService:       deferredService,
-		claudeTokenProvider:   claudeTokenProvider,
-		sessionLimitCache:     sessionLimitCache,
-		rpmCache:              rpmCache,
-		userGroupRateCache:    gocache.New(userGroupRateTTL, time.Minute),
-		settingService:        settingService,
-		modelsListCache:       gocache.New(modelsListTTL, time.Minute),
-		modelsListCacheTTL:    modelsListTTL,
-		responseHeaderFilter:  compileResponseHeaderFilter(cfg),
-		tlsFPProfileService:   tlsFPProfileService,
-		channelService:        channelService,
-		resolver:              resolver,
-		balanceNotifyService:  balanceNotifyService,
-		userPlatformQuotaRepo: userPlatformQuotaRepo,
-		primaryHealthService:  primaryHealthService,
+		accountRepo:                  accountRepo,
+		groupRepo:                    groupRepo,
+		usageLogRepo:                 usageLogRepo,
+		usageBillingRepo:             usageBillingRepo,
+		userRepo:                     userRepo,
+		userSubRepo:                  userSubRepo,
+		userGroupRateRepo:            userGroupRateRepo,
+		cache:                        cache,
+		digestStore:                  digestStore,
+		cfg:                          cfg,
+		schedulerSnapshot:            schedulerSnapshot,
+		concurrencyService:           concurrencyService,
+		billingService:               billingService,
+		rateLimitService:             rateLimitService,
+		billingCacheService:          billingCacheService,
+		identityService:              identityService,
+		httpUpstream:                 httpUpstream,
+		deferredService:              deferredService,
+		claudeTokenProvider:          claudeTokenProvider,
+		sessionLimitCache:            sessionLimitCache,
+		rpmCache:                     rpmCache,
+		userGroupRateCache:           gocache.New(userGroupRateTTL, time.Minute),
+		settingService:               settingService,
+		modelsListCache:              gocache.New(modelsListTTL, time.Minute),
+		modelsListCacheTTL:           modelsListTTL,
+		responseHeaderFilter:         compileResponseHeaderFilter(cfg),
+		tlsFPProfileService:          tlsFPProfileService,
+		channelService:               channelService,
+		resolver:                     resolver,
+		balanceNotifyService:         balanceNotifyService,
+		userPlatformQuotaRepo:        userPlatformQuotaRepo,
+		primaryHealthService:         primaryHealthService,
+		abnormalOutputIsolationCache: gocache.New(10*time.Minute, time.Minute),
 	}
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		userGroupRateRepo,
@@ -798,6 +803,15 @@ func (s *GatewayService) BindStickySession(ctx context.Context, groupID *int64, 
 		return nil
 	}
 	return s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, accountID, stickySessionTTL)
+}
+
+// ClearStickySession removes a session binding before a semantic failover so
+// the same unhealthy account cannot be selected again immediately.
+func (s *GatewayService) ClearStickySession(ctx context.Context, groupID *int64, sessionHash string) error {
+	if s == nil || s.cache == nil || strings.TrimSpace(sessionHash) == "" {
+		return nil
+	}
+	return s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 }
 
 // GetCachedSessionAccountID retrieves the account ID bound to a sticky session.
@@ -4538,6 +4552,15 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	reqModel := parsed.Model
 	reqStream := parsed.Stream
 	originalModel := clientModelFromContext(ctx, reqModel)
+	if continuationState, ok := AnthropicContinuationFromContext(ctx); ok {
+		continuationBody, continuationErr := BuildAnthropicContinuationBody(body, continuationState.VisibleText)
+		if continuationErr != nil {
+			return nil, continuationErr
+		}
+		if err := replaceBody(continuationBody); err != nil {
+			return nil, err
+		}
+	}
 
 	// === DEBUG: 打印客户端原始请求（headers + body 摘要）===
 	if c != nil {
@@ -5928,6 +5951,11 @@ func (s *GatewayService) handleNonStreamingResponseAnthropicAPIKeyPassthrough(
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
 	if err != nil {
 		return nil, err
+	}
+	if s.cfg == nil || s.cfg.Gateway.AbnormalOutputDetectionEnabled {
+		if detection := detectAnthropicNonStreamingAbnormalOutput(body, s.cfg); detection.Triggered {
+			return nil, newAbnormalOutputFailoverError(false, detection, "", 0, ClaudeUsage{})
+		}
 	}
 
 	usage := parseClaudeUsageFromResponseBody(body)
@@ -7728,6 +7756,54 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 		maxLineSize = s.cfg.Gateway.MaxLineSize
 	}
 	attemptBuffer := newAnthropicAttemptBuffer(ctx, maxLineSize)
+	continuationState, continuation := AnthropicContinuationFromContext(ctx)
+	if continuation {
+		// The downstream message envelope was already opened by the first
+		// account. Only compatible content events may be forwarded now.
+		attemptBuffer.committed = true
+	}
+	abnormalEnabled := s.cfg == nil || s.cfg.Gateway.AbnormalOutputDetectionEnabled
+	abnormalDetector := newAnthropicAbnormalOutputDetectorForConfig(s.cfg)
+	visibleText := &bytes.Buffer{}
+	if continuation {
+		visibleText.WriteString(continuationState.VisibleText)
+	}
+	currentTextBlockIndex := 0
+	continuationProduced := false
+	structuredOutputStarted := false
+	if continuation {
+		currentTextBlockIndex = continuationState.TextBlockIndex + 1
+	}
+	abnormalQuarantine := abnormalEnabled && !continuation && PreContentTrackerFromContext(ctx) != nil
+	abnormalQuarantineBytes := 8 * 1024
+	abnormalQuarantineUnits := 10
+	abnormalQuarantineHold := 1500 * time.Millisecond
+	if s.cfg != nil {
+		if s.cfg.Gateway.AbnormalOutputPrecommitBufferBytes > 0 {
+			abnormalQuarantineBytes = s.cfg.Gateway.AbnormalOutputPrecommitBufferBytes
+		}
+		if s.cfg.Gateway.AbnormalOutputPrecommitTextUnits > 0 {
+			abnormalQuarantineUnits = s.cfg.Gateway.AbnormalOutputPrecommitTextUnits
+		}
+		if s.cfg.Gateway.AbnormalOutputPrecommitMaxHoldMs > 0 {
+			abnormalQuarantineHold = time.Duration(s.cfg.Gateway.AbnormalOutputPrecommitMaxHoldMs) * time.Millisecond
+		}
+	}
+	var quarantinedBlocks [][]byte
+	quarantineTimer := time.NewTimer(abnormalQuarantineHold)
+	if !abnormalQuarantine {
+		if !quarantineTimer.Stop() {
+			<-quarantineTimer.C
+		}
+	}
+	defer func() {
+		if !quarantineTimer.Stop() {
+			select {
+			case <-quarantineTimer.C:
+			default:
+			}
+		}
+	}()
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
 
@@ -7880,6 +7956,29 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 			eventName = eventType
 		}
 		eventChanged := false
+		if !continuation && eventType == "content_block_start" {
+			if index, ok := parseSSEUsageInt(event["index"]); ok {
+				if block, ok := event["content_block"].(map[string]any); ok {
+					if block["type"] == "text" {
+						currentTextBlockIndex = index
+					} else if block["type"] == "tool_use" || block["type"] == "server_tool_use" {
+						structuredOutputStarted = true
+					}
+				}
+			}
+		}
+		if continuation && eventType == "content_block_delta" {
+			delta, _ := event["delta"].(map[string]any)
+			if delta["type"] != "text_delta" {
+				return nil, dataLine, nil, nil
+			}
+			event["index"] = currentTextBlockIndex
+			eventChanged = true
+		}
+		if continuation && eventType == "content_block_stop" {
+			event["index"] = currentTextBlockIndex
+			eventChanged = true
+		}
 
 		// 兼容 Kimi cached_tokens → cache_read_input_tokens
 		if eventType == "message_start" {
@@ -7922,6 +8021,25 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 		}
 
 		usagePatch := s.extractSSEUsagePatch(event)
+		if continuation && eventType == "message_start" && usagePatch != nil {
+			usagePatch.inputTokens = continuationState.OriginalUsage.InputTokens
+			usagePatch.hasInputTokens = true
+			usagePatch.cacheCreationInputTokens = continuationState.OriginalUsage.CacheCreationInputTokens
+			usagePatch.hasCacheCreationInput = true
+			usagePatch.cacheReadInputTokens = continuationState.OriginalUsage.CacheReadInputTokens
+			usagePatch.hasCacheReadInput = true
+		}
+		if continuation && (eventType == "message_start" || eventType == "content_block_start") {
+			return nil, dataLine, usagePatch, nil
+		}
+		if continuation && eventType == "message_delta" {
+			if usageObj, ok := event["usage"].(map[string]any); ok {
+				usageObj["input_tokens"] = continuationState.OriginalUsage.InputTokens
+				usageObj["cache_creation_input_tokens"] = continuationState.OriginalUsage.CacheCreationInputTokens
+				usageObj["cache_read_input_tokens"] = continuationState.OriginalUsage.CacheReadInputTokens
+				eventChanged = true
+			}
+		}
 		if anthropicStreamEventIsTerminal(eventName, dataLine) {
 			sawTerminalEvent = true
 		}
@@ -7953,13 +8071,67 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 		return []string{block}, string(newData), usagePatch, nil
 	}
 
+	writeAnthropicOutput := func(restored []byte, textDelta string) error {
+		if continuation && textDelta != "" && !continuationProduced {
+			if tracker := PreContentTrackerFromContext(ctx); tracker != nil && !tracker.MarkEffectiveContent() {
+				return context.Cause(tracker.Context())
+			}
+			continuationProduced = true
+		}
+		output, committedNow, bufferErr := attemptBuffer.Accept(restored)
+		if bufferErr != nil {
+			return bufferErr
+		}
+		if committedNow && firstTokenMs == nil {
+			ms := int(time.Since(startTime).Milliseconds())
+			firstTokenMs = &ms
+		}
+		if textDelta != "" && len(output) > 0 {
+			appendVisibleAnthropicText(visibleText, textDelta)
+		}
+		if clientDisconnected || len(output) == 0 {
+			return nil
+		}
+		if _, err := w.Write(output); err != nil {
+			clientDisconnected = true
+			logger.LegacyPrintf("service.gateway", "Client disconnected during streaming, continuing to drain upstream for billing")
+			return nil
+		}
+		flusher.Flush()
+		lastDataAt = time.Now()
+		return nil
+	}
+
+	flushQuarantined := func() error {
+		if !abnormalQuarantine {
+			return nil
+		}
+		abnormalQuarantine = false
+		for _, block := range quarantinedBlocks {
+			if err := writeAnthropicOutput(block, extractAnthropicTextDeltaFromBlock(block)); err != nil {
+				return err
+			}
+		}
+		quarantinedBlocks = nil
+		return nil
+	}
+
 	for {
 		select {
 		case ev, ok := <-events:
 			if !ok {
+				if err := flushQuarantined(); err != nil {
+					if errors.Is(err, ErrPreContentRoutingDeadline) {
+						return nil, ErrPreContentRoutingDeadline
+					}
+					return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
+				}
 				if !attemptBuffer.Committed() {
 					attemptBuffer.Discard()
 					return nil, newAnthropicStreamFailoverError("upstream_empty_stream", "Upstream stream ended before content")
+				}
+				if continuation && !continuationProduced {
+					return nil, newAnthropicStreamFailoverError("upstream_empty_stream", "Continuation stream ended before content")
 				}
 				// 上游完成，返回结果
 				if !sawTerminalEvent {
@@ -7975,6 +8147,9 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 				if !attemptBuffer.Committed() {
 					attemptBuffer.Discard()
 					return nil, newAnthropicStreamFailoverError("upstream_disconnected", "Upstream stream disconnected before content")
+				}
+				if continuation && !continuationProduced {
+					return nil, newAnthropicStreamFailoverError("upstream_disconnected", "Continuation stream disconnected before content")
 				}
 				if sawTerminalEvent {
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil
@@ -8020,42 +8195,56 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 						attemptBuffer.Discard()
 						return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
 					}
+					if continuation && !continuationProduced {
+						return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Continuation upstream returned an error before content")
+					}
 					return nil, err
+				}
+				if data != "" && usagePatch != nil {
+					mergeSSEUsagePatch(usage, usagePatch)
 				}
 
 				for _, block := range outputBlocks {
 					restored := reverseToolNamesIfPresent(c, []byte(block))
-					output, committedNow, bufferErr := attemptBuffer.Accept(restored)
-					if bufferErr != nil {
-						if errors.Is(bufferErr, ErrPreContentRoutingDeadline) {
+					textDelta := extractAnthropicTextDelta(data)
+					if abnormalEnabled && !structuredOutputStarted && textDelta != "" {
+						if detection := abnormalDetector.ObserveText(textDelta); detection.Triggered {
+							attemptBuffer.Discard()
+							return nil, newAbnormalOutputFailoverError(attemptBuffer.Committed(), detection, visibleText.String(), currentTextBlockIndex, *usage)
+						}
+					}
+					if abnormalQuarantine && !attemptBuffer.Committed() {
+						quarantinedBlocks = append(quarantinedBlocks, []byte(restored))
+						if len(quarantinedBlocks) < abnormalQuarantineUnits && quarantinedBlockBytes(quarantinedBlocks) < abnormalQuarantineBytes {
+							continue
+						}
+						if err := flushQuarantined(); err != nil {
+							if errors.Is(err, ErrPreContentRoutingDeadline) {
+								return nil, ErrPreContentRoutingDeadline
+							}
+							return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
+						}
+						continue
+					}
+					if err := writeAnthropicOutput(restored, textDelta); err != nil {
+						if errors.Is(err, ErrPreContentRoutingDeadline) {
 							return nil, ErrPreContentRoutingDeadline
 						}
 						return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
-					}
-					if data != "" && usagePatch != nil {
-						mergeSSEUsagePatch(usage, usagePatch)
-					}
-					if committedNow && firstTokenMs == nil {
-						ms := int(time.Since(startTime).Milliseconds())
-						firstTokenMs = &ms
-					}
-					if len(output) == 0 {
-						continue
-					}
-					if !clientDisconnected {
-						if _, werr := w.Write(output); werr != nil {
-							clientDisconnected = true
-							logger.LegacyPrintf("service.gateway", "Client disconnected during streaming, continuing to drain upstream for billing")
-							break
-						}
-						flusher.Flush()
-						lastDataAt = time.Now()
 					}
 				}
 				continue
 			}
 
 			pendingEventLines = append(pendingEventLines, line)
+
+		case <-quarantineTimer.C:
+			if err := flushQuarantined(); err != nil {
+				if errors.Is(err, ErrPreContentRoutingDeadline) {
+					return nil, ErrPreContentRoutingDeadline
+				}
+				return nil, newAnthropicStreamFailoverError("upstream_stream_error", "Upstream returned an error before content")
+			}
 
 		case <-intervalCh:
 			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
@@ -8071,6 +8260,9 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 					s.rateLimitService.HandleStreamTimeout(ctx, account, originalModel)
 				}
 				return nil, newAnthropicStreamFailoverError("stream_timeout", fmt.Sprintf("upstream stream idle for %s before content", streamInterval))
+			}
+			if continuation && !continuationProduced {
+				return nil, newAnthropicStreamFailoverError("stream_timeout", fmt.Sprintf("continuation stream idle for %s before content", streamInterval))
 			}
 			logger.LegacyPrintf("service.gateway", "Stream data interval timeout: account=%d model=%s interval=%s", account.ID, originalModel, streamInterval)
 			// 处理流超时，可能标记账户为临时不可调度或错误状态
@@ -8346,6 +8538,11 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
 	if err != nil {
 		return nil, err
+	}
+	if s.cfg == nil || s.cfg.Gateway.AbnormalOutputDetectionEnabled {
+		if detection := detectAnthropicNonStreamingAbnormalOutput(body, s.cfg); detection.Triggered {
+			return nil, newAbnormalOutputFailoverError(false, detection, "", 0, ClaudeUsage{})
+		}
 	}
 
 	// 解析usage

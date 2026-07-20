@@ -763,6 +763,17 @@ type GatewayConfig struct {
 	// MaxLineSize: 上游 SSE 单行最大字节数（0使用默认值）
 	MaxLineSize int `mapstructure:"max_line_size"`
 
+	// Abnormal output detection for Anthropic text streams.
+	AbnormalOutputDetectionEnabled        bool `mapstructure:"abnormal_output_detection_enabled"`
+	AbnormalOutputRepeatWindowSeconds     int  `mapstructure:"abnormal_output_repeat_window_seconds"`
+	AbnormalOutputLineRepeatThreshold     int  `mapstructure:"abnormal_output_line_repeat_threshold"`
+	AbnormalOutputWordRepeatThreshold     int  `mapstructure:"abnormal_output_word_repeat_threshold"`
+	AbnormalOutputMinWordCharacters       int  `mapstructure:"abnormal_output_min_word_characters"`
+	AbnormalOutputPrecommitBufferBytes    int  `mapstructure:"abnormal_output_precommit_buffer_bytes"`
+	AbnormalOutputPrecommitTextUnits      int  `mapstructure:"abnormal_output_precommit_text_units"`
+	AbnormalOutputPrecommitMaxHoldMs      int  `mapstructure:"abnormal_output_precommit_max_hold_ms"`
+	AbnormalOutputAccountIsolationSeconds int  `mapstructure:"abnormal_output_account_isolation_seconds"`
+
 	// 是否记录上游错误响应体摘要（避免输出请求内容）
 	LogUpstreamErrorBody bool `mapstructure:"log_upstream_error_body"`
 	// 上游错误响应体记录最大字节数（超过会截断）
@@ -1901,6 +1912,15 @@ func setDefaults() {
 	viper.SetDefault("gateway.image_stream_data_interval_timeout", 900)
 	viper.SetDefault("gateway.image_stream_keepalive_interval", 10)
 	viper.SetDefault("gateway.max_line_size", 500*1024*1024)
+	viper.SetDefault("gateway.abnormal_output_detection_enabled", true)
+	viper.SetDefault("gateway.abnormal_output_repeat_window_seconds", 5)
+	viper.SetDefault("gateway.abnormal_output_line_repeat_threshold", 6)
+	viper.SetDefault("gateway.abnormal_output_word_repeat_threshold", 8)
+	viper.SetDefault("gateway.abnormal_output_min_word_characters", 3)
+	viper.SetDefault("gateway.abnormal_output_precommit_buffer_bytes", 8*1024)
+	viper.SetDefault("gateway.abnormal_output_precommit_text_units", 10)
+	viper.SetDefault("gateway.abnormal_output_precommit_max_hold_ms", 1500)
+	viper.SetDefault("gateway.abnormal_output_account_isolation_seconds", 600)
 	viper.SetDefault("gateway.scheduling.sticky_session_max_waiting", 3)
 	viper.SetDefault("gateway.scheduling.sticky_session_wait_timeout", 120*time.Second)
 	viper.SetDefault("gateway.scheduling.fallback_wait_timeout", 30*time.Second)

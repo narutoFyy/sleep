@@ -36,6 +36,17 @@ type PreContentTracker struct {
 	deadlineFired bool
 }
 
+// AllowContinuationRetry re-arms the effective-content gate for an internal
+// continuation attempt while preserving the already-open downstream stream.
+func (t *PreContentTracker) AllowContinuationRetry() {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.effective = false
+	t.mu.Unlock()
+}
+
 func NewPreContentTracker(parent context.Context, deadline time.Duration) *PreContentTracker {
 	if parent == nil {
 		parent = context.Background()

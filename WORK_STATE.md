@@ -6,7 +6,7 @@
 
 ## Current task
 
-All planned tasks are complete. The verified standby build is healthy on production port 8090, and the temporary 8084 deployment has been removed.
+Implement abnormal repeated-output detection and same-model automatic failover/continuation. Production port 8090 must remain unchanged; validation is isolated to port 8084.
 
 ## Rules
 
@@ -14,6 +14,8 @@ All planned tasks are complete. The verified standby build is healthy on product
 - Preserve the production service on port 8090 throughout this work.
 - Deploy the changed build only on port 8084.
 - Keep exactly one pre-change source archive for this work.
+- Do not modify or replace port 8090 during this run.
+- Do not reuse standby accounts as ordinary primary accounts; regular accounts are exhausted before group standby.
 - Do not infer standby model mappings; administrators must configure them explicitly.
 - Do not allow standby routing across provider families.
 
@@ -42,7 +44,26 @@ All planned tasks are complete. The verified standby build is healthy on product
 
 ## Active Task
 
-None. All planned tasks passed main verification.
+T-011: abnormal-output detection and automatic same-model failover.
+
+## Current Run Tasks
+
+| ID | Task | Status | Allowed write scope | Verification |
+| --- | --- | --- | --- | --- |
+| T-011-A | Create one current-source backup and finalize the abnormal-output TODO | done | `WORK_STATE.md`, `docs/ABNORMAL_OUTPUT_FAILOVER_TODO.md`, server backup directory | Archive checksum/listing and document review |
+| T-011-B | Implement detector, pre-commit retry and post-commit continuation failover | done | Anthropic gateway/service/handler code and focused tests | Focused Go tests and diff review |
+| T-011-C | Build and deploy isolated test instance on 8084 | done | 8084 test deployment only | Health, SSE routing, repeated-output and billing checks |
+| T-011-D | Main verification and handoff | done | Tests and test artifacts only | Full relevant test sweep; 8090 unchanged |
+
+## T-011 Acceptance Criteria
+
+- A single user request automatically switches accounts without requiring another Enter or client retry.
+- Early repeated output is discarded before it reaches the client and retries the same model on another regular account.
+- Late repeated output stops promptly, and the same downstream SSE request continues from the already-visible normal text on another eligible account.
+- The downstream receives one logical assistant stream, original model name and original group pricing.
+- Primary accounts are exhausted before configured group standby accounts are used.
+- No full prompt or response is persisted for detection; audit records identify the reason and route attempts.
+- Port 8090 remains on its pre-run image and process; port 8084 is the only deployment target.
 
 ## Latest Completion Evidence
 
@@ -56,6 +77,14 @@ None. All planned tasks passed main verification.
 
 - Purpose: make OpenAI Chat Completions streams fail over when an HTTP 200 upstream disconnects after only keepalive or metadata frames.
 - Completion evidence: focused stream regressions, full service/handler suites and backend `go test ./...` passed; controlled 8084 tests used `cs/primary` while healthy, switched heartbeat-only and metadata-only EOF requests to `kun/standby` with two audited attempts and no client error, and kept content-then-EOF on the original account with an explicit stream error instead of splicing responses. Image `sub2api-shitou:shitoutk-precontent-fix-20260718` is deployed and healthy on 8090; the temporary 8084 application container was removed after production verification.
+
+### T-011
+
+- Purpose: detect semantic repeated Anthropic output early and automatically continue the same request on another eligible regular account without a client resubmit.
+- Implementation: normalized repeated-line and repeated-word detector; bounded initial quarantine; same-model regular-account failover; late-stream continuation using assistant prefill; one downstream SSE envelope; user/model/account isolation for 10 minutes; `abnormal_output` route audit classification; original requested model and group pricing retained.
+- Completion evidence: focused `internal/service` and `internal/handler` tests passed; full backend `go test ./... -count=1` passed; final image `sub2api-shitou:abnormal-output-8084-final-20260720` has ID `sha256:7a915230429a87e3b47b80e0e441d26413773ea437057d9a4ee24ca40dc65e60`; container `sub2api-abnormal-8084` is healthy on port 8084.
+- Controlled E2E: early repetition produced one HTTP 200 response with only replacement text; late repetition preserved the visible prefix, emitted two valid text blocks with one message lifecycle, and continued automatically; each failover produced one usage row with two attempts, original input tokens and `abnormal_output`; a new session skipped the isolated account and completed in one attempt. Temporary test records and mock container were removed afterward.
+- Production protection: `sub2api` remains container `a0db0f5a7c41b86139c565e223b04805844bff5d2c0b2cdb611285152377901b` on image `sub2api-shitou:shitoutk-precontent-fix-20260718`; it was not restarted or replaced.
 
 ## File Access Requests
 
@@ -114,3 +143,7 @@ None. All planned tasks passed main verification.
 - 2026-07-18: T-010 passed focused tests, full service/handler tests, backend `go test ./...`, image build, and five controlled 8084 routing scenarios; `T-010 implementing -> self_check -> main_verify -> done`; work status set to `complete`.
 - 2026-07-18: With explicit production approval, replaced 8090 with the verified T-010 image, confirmed consecutive health checks and zero startup/migration errors, then removed the 8084 test application and rollback containers. Ports 8084/8086/8087 are closed.
 - 2026-07-18: Assigned `T-004` to child agent; `assigned -> implementing`.
+- 2026-07-20: T-011-B passed focused and full backend tests after the final detector/isolation cleanup.
+- 2026-07-20: T-011-C built and deployed `sub2api-shitou:abnormal-output-8084-final-20260720` on port 8084; health check passed and 8090 fingerprint remained unchanged.
+- 2026-07-20: Controlled early, late and user-scoped isolation E2E scenarios passed with temporary records; all temporary records, mock container and test-only image were removed.
+- 2026-07-20: T-011-D completed; `go test ./... -count=1` passed and work status set to `complete`.

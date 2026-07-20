@@ -60,6 +60,121 @@ func TestGatewayService_StreamingReusesScannerBufferAndStillParsesUsage(t *testi
 	require.Equal(t, 1, strings.Count(rec.Body.String(), `"type":"message_start"`))
 }
 
+func TestGatewayService_EarlyRepeatedOutputReturnsFailoverWithoutVisibleText(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &GatewayService{
+		cfg: &config.Config{Gateway: config.GatewayConfig{
+			AbnormalOutputDetectionEnabled:     true,
+			AbnormalOutputPrecommitMaxHoldMs:   5000,
+			AbnormalOutputPrecommitTextUnits:   10,
+			AbnormalOutputPrecommitBufferBytes: 8192,
+		}},
+		rateLimitService: &RateLimitService{},
+	}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	tracker := NewPreContentTracker(context.Background(), time.Second)
+	defer tracker.Close()
+	payload := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":3}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+	for i := 0; i < 8; i++ {
+		payload += "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"course \"}}\n\n"
+	}
+	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(payload))}
+
+	_, err := svc.handleStreamingResponse(tracker.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model", false)
+	var abnormalErr *AbnormalOutputFailoverError
+	require.ErrorAs(t, err, &abnormalErr)
+	require.False(t, abnormalErr.Committed)
+	require.Empty(t, rec.Body.String())
+	require.Equal(t, 8, abnormalErr.RepeatCount)
+}
+
+func TestGatewayService_AbnormalOutputDetectionDisabledPreservesStream(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &GatewayService{
+		cfg: &config.Config{Gateway: config.GatewayConfig{
+			AbnormalOutputDetectionEnabled: false,
+		}},
+		rateLimitService: &RateLimitService{},
+	}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	tracker := NewPreContentTracker(context.Background(), time.Second)
+	defer tracker.Close()
+	payload := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":3}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+	for i := 0; i < 8; i++ {
+		payload += "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"course \"}}\n\n"
+	}
+	payload += "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":8}}\n\n" +
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(payload))}
+
+	result, err := svc.handleStreamingResponse(tracker.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model", false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 8, strings.Count(rec.Body.String(), "course "))
+}
+
+func TestGatewayService_LateRepeatedOutputCarriesContinuationState(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &GatewayService{
+		cfg: &config.Config{Gateway: config.GatewayConfig{
+			AbnormalOutputDetectionEnabled:   true,
+			AbnormalOutputPrecommitTextUnits: 1,
+		}},
+		rateLimitService: &RateLimitService{},
+	}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	tracker := NewPreContentTracker(context.Background(), time.Second)
+	defer tracker.Close()
+	payload := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":3}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":2,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"text_delta\",\"text\":\"Useful beginning. \"}}\n\n"
+	for i := 0; i < 8; i++ {
+		payload += "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"text_delta\",\"text\":\"course \"}}\n\n"
+	}
+	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(payload))}
+
+	_, err := svc.handleStreamingResponse(tracker.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model", false)
+	var abnormalErr *AbnormalOutputFailoverError
+	require.ErrorAs(t, err, &abnormalErr)
+	require.True(t, abnormalErr.Committed)
+	require.Equal(t, 2, abnormalErr.TextBlockIndex)
+	require.Contains(t, abnormalErr.VisibleText, "Useful beginning")
+	require.Contains(t, rec.Body.String(), "Useful beginning")
+}
+
+func TestGatewayService_ContinuationSuppressesSecondEnvelope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &GatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{AbnormalOutputDetectionEnabled: true}}, rateLimitService: &RateLimitService{}}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	ctx := WithAnthropicContinuation(context.Background(), "Useful beginning. ", 2, ClaudeUsage{InputTokens: 11})
+	payload := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":99}}}\n\n" +
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"continued\"}}\n\n" +
+		"event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":4}}\n\n" +
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(payload))}
+
+	result, err := svc.handleStreamingResponse(ctx, resp, c, &Account{ID: 2}, time.Now(), "model", "model", false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 11, result.usage.InputTokens)
+	require.NotContains(t, rec.Body.String(), "message_start")
+	require.Contains(t, rec.Body.String(), "continued")
+	require.Contains(t, rec.Body.String(), `"index":3`)
+}
+
 type streamReadError struct{ err error }
 
 func (r streamReadError) Read([]byte) (int, error) { return 0, r.err }
